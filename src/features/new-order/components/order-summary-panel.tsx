@@ -83,6 +83,8 @@ export function OrderSummaryPanel({
     showValidation,
     setDebt,
     editingOrder,
+    fieldErrors,
+    saveError,
   } = state;
 
   const subtotal = selectSubtotal(state);
@@ -216,9 +218,10 @@ export function OrderSummaryPanel({
           marked={!selectPaymentUnmarked(state)}
           onUnmark={unmarkPayment}
           error={
-            showValidation && !splitPayment && !nothingPayable && paymentType === null
+            fieldErrors.payment_type?.[0] ??
+            (showValidation && !splitPayment && !nothingPayable && paymentType === null
               ? "To'lov turini tanlang"
-              : null
+              : null)
           }
         />
       </div>
@@ -270,13 +273,18 @@ export function OrderSummaryPanel({
         />
       </div>
 
-      {showValidation && blocker && (
+      {/*
+        One red line above the button, and the server's refusal outranks the
+        local one: it is the more recent fact, and it names something the form
+        could not have known before asking.
+      */}
+      {(saveError ?? (showValidation ? blocker : null)) && (
         <p
           role="alert"
           className="bg-danger/10 text-caption text-danger flex items-start gap-2 rounded-sm p-2.5"
         >
           <TriangleAlert className="mt-px size-4 shrink-0" aria-hidden />
-          {blocker}
+          {saveError ?? blocker}
         </p>
       )}
 

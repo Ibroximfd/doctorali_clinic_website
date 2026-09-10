@@ -65,6 +65,7 @@ export function NewOrderView() {
     reset,
     setShowValidation,
     setFieldErrors,
+    setSaveError,
     applyStockIssues,
   } = state;
 
@@ -86,6 +87,7 @@ export function NewOrderView() {
 
   async function save(confirmPin?: string) {
     setSubmitting(true);
+    setSaveError(null);
     try {
       const draft = {
         orderType: state.orderType,
@@ -134,9 +136,14 @@ export function NewOrderView() {
         // lose to each other) — fold them back into the cart so the lines
         // correct themselves instead of failing again on resubmit.
         applyStockIssues(error.stockIssues);
+        // Both: the toast catches the eye, the panel keeps the server's reason
+        // on screen while the desk fixes what it names.
+        setSaveError(error.message);
         toast.error(error.message);
       } else {
-        toast.error("Kutilmagan xatolik yuz berdi. Qayta urinib ko'ring.");
+        const message = "Kutilmagan xatolik yuz berdi. Qayta urinib ko'ring.";
+        setSaveError(message);
+        toast.error(message);
       }
     } finally {
       setSubmitting(false);

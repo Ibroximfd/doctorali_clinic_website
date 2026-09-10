@@ -237,7 +237,11 @@ export function updateOrder(
           paymentType: draft.paymentType,
           payments: draft.payments ?? null,
         }),
-        ...(draft.doctor ? { doctor_id: Number.parseInt(draft.doctor.id, 10) } : {}),
+        // ALWAYS sent, `null` included: the body carries the order's new state,
+        // and a key left out is a field the server keeps as it was. Omitting it
+        // for a cleared doctor left the old one on the order — an edit that
+        // moved a sale to a staff purchase went on paying them commission.
+        doctor_id: draft.doctor ? Number.parseInt(draft.doctor.id, 10) : null,
         ...(draft.buyerType ? { buyer_type: draft.buyerType } : {}),
         ...(draft.note !== null && draft.note !== undefined
           ? { note: draft.note.trim() }

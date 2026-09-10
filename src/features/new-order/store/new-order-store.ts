@@ -81,6 +81,13 @@ export interface NewOrderState {
   notice: string | null;
   /** Per-field messages from a refused save. */
   fieldErrors: Readonly<Record<string, readonly string[]>>;
+  /**
+   * The server's own sentence for the last refused save, kept until the next
+   * submit. The toast that carries it is gone in seconds, and the reason a save
+   * was refused is the one thing the desk needs still on screen while they fix
+   * it.
+   */
+  saveError: string | null;
 }
 
 interface NewOrderActions {
@@ -124,6 +131,7 @@ interface NewOrderActions {
   setShowValidation: (show: boolean) => void;
   clearNotice: () => void;
   setFieldErrors: (errors: Readonly<Record<string, readonly string[]>>) => void;
+  setSaveError: (message: string | null) => void;
   /** Folds the server's real balances back into the cart after a stock refusal. */
   applyStockIssues: (issues: readonly StockIssue[]) => void;
 }
@@ -155,6 +163,7 @@ const INITIAL: NewOrderState = {
   showValidation: false,
   notice: null,
   fieldErrors: {},
+  saveError: null,
 };
 
 export const useNewOrderStore = create<NewOrderState & NewOrderActions>()((set, get) => {
@@ -517,6 +526,10 @@ export const useNewOrderStore = create<NewOrderState & NewOrderActions>()((set, 
 
     setFieldErrors(errors) {
       set({ fieldErrors: errors });
+    },
+
+    setSaveError(message) {
+      set({ saveError: message });
     },
 
     applyStockIssues(issues) {
