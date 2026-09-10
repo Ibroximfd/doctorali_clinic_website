@@ -1,0 +1,248 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <style>
+    body { margin: 0; }
+    * { box-sizing: border-box; }
+    a { color: #1f7c52; text-decoration: none; }
+    a:hover { color: #2e9e6b; }
+    .da { font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif; }
+    .num { font-variant-numeric: tabular-nums; }
+    .card { background: #fff; border: 1px solid #e4e8e4; border-radius: 18px; box-shadow: 0 2px 8px rgba(34,58,44,0.07); }
+    .chip { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #e4e8e4; background: #fff; font-size: 12.5px; font-weight: 600; color: #566056; }
+    .chip.on { background: #e6f5ee; border-color: #e6f5ee; color: #1f7c52; font-weight: 700; }
+    .tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 700; }
+    .th { font-size: 11px; font-weight: 700; letter-spacing: 0.4px; color: #8a938a; text-transform: uppercase; }
+    .td { font-size: 13.5px; }
+  </style>
+</helmet>
+
+<div class="da" style="width: 1440px; height: 980px; display: flex; flex-direction: column; background: #f5f7f6; color: #1b241f; overflow: hidden">
+
+  <header style="height: 72px; flex: 0 0 72px; padding: 0 20px; background: #f5f7f6; border-bottom: 1px solid #e4e8e4; display: flex; align-items: center">
+    <div style="flex: 1 1 auto">
+      <div style="font-size: 18px; font-weight: 600; line-height: 1.3">Buyurtmalar</div>
+      <div style="font-size: 12.5px; color: #566056">Barcha buyurtmalar tarixi</div>
+    </div>
+    <div style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; background: #fff; border: 1px solid #e4e8e4; border-radius: 14px">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2e9e6b" stroke-width="2" stroke-linecap="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>
+      <span style="font-size: 12.5px; font-weight: 600">9 sentabr 2026</span>
+    </div>
+  </header>
+
+  <div style="flex: 1 1 auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; overflow: hidden">
+
+    <!-- Filters -->
+    <div class="card" style="padding: 14px 16px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; align-items: center; gap: 8px">
+        <div style="display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border: 1px solid #e4e8e4; border-radius: 14px; width: 320px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a938a" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <span style="font-size: 13px; color: #8a938a">Raqam, ism yoki telefon&hellip;</span>
+        </div>
+        <span class="chip on">Bugun</span>
+        <span class="chip">Hafta</span>
+        <span class="chip">Oy</span>
+        <span class="chip">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>
+          Davr
+        </span>
+        <div style="width: 1px; height: 24px; background: #e4e8e4; margin: 0 4px"></div>
+        <span class="chip">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 11v4"/><path d="M14 13h-4"/><rect width="20" height="14" x="2" y="6" rx="2"/></svg>
+          Shifokor
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+        </span>
+        <span class="chip">To&rsquo;lov turi <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></span>
+        <span class="chip">Qarzli <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></span>
+        <div style="flex: 1 1 auto"></div>
+        <span class="chip"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg> Excel</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px">
+        <span style="font-size: 12.5px; color: #8a938a">Filtr:</span>
+        <span class="tag" style="background: #e6f5ee; color: #1f7c52; padding: 5px 10px; font-size: 12.5px">Bugun &middot; 9 sentabr</span>
+        <span class="tag" style="background: #f0f3f1; color: #566056; padding: 5px 10px; font-size: 12.5px">Dr. Aliyev
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </span>
+        <span style="font-size: 12.5px; color: #8a938a; margin-left: 4px">34 ta buyurtma &middot; jami <b class="num" style="color: #1b241f">13 550 000</b></span>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="card" style="flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column">
+      <div style="display: grid; grid-template-columns: 148px 1fr 150px 92px 130px 118px 140px 44px; gap: 12px; padding: 14px 20px; border-bottom: 1px solid #e4e8e4; background: #fbfcfb">
+        <span class="th">Raqam</span>
+        <span class="th">Mijoz</span>
+        <span class="th">Shifokor</span>
+        <span class="th" style="text-align: center">Dona</span>
+        <span class="th" style="text-align: right">Summa</span>
+        <span class="th" style="text-align: right">Komissiya</span>
+        <span class="th">Holat</span>
+        <span class="th"></span>
+      </div>
+
+      <div style="flex: 1 1 auto; overflow: hidden">
+
+        <div style="display: grid; grid-template-columns: 148px 1fr 150px 92px 130px 118px 140px 44px; gap: 12px; padding: 13px 20px; border-bottom: 1px solid #f0f3f1; align-items: center">
+          <div><div class="num td" style="font-weight: 700">#20260909-014</div><div class="num" style="font-size: 11.5px; color: #8a938a">13:42</div></div>
+          <div style="display: flex; align-items: center; gap: 10px; min-width: 0">
+            <div style="width: 32px; height: 32px; flex: 0 0 32px; border-radius: 999px; background: #e6f5ee; color: #1f7c52; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700">DK</div>
+            <div style="min-width: 0">
+              <div class="td" style="font-weight: 600">Dilnoza Karimova</div>
+              <div class="num" style="font-size: 11.5px; color: #8a938a">+998 (90) 123-45-67</div>
+            </div>
+            <span class="tag" style="background: #fdf3e2; color: #b57a12">Qarz 1 000 000</span>
+          </div>
+          <div class="td" style="color: #566056">Dr. Aliyev</div>
+          <div class="num td" style="text-align: center">24</div>
+          <div class="num td" style="text-align: right; font-weight: 700">3 330 000</div>
+          <div class="num td" style="text-align: right; color: #566056">416 250</div>
+          <div style="display: flex; gap: 4px; flex-wrap: wrap"><span class="tag" style="background: #e6f5ee; color: #1f7c52">Bajarilgan</span><span class="tag" style="background: #f0f3f1; color: #566056">Naqd</span></div>
+          <div style="display: flex; justify-content: flex-end; color: #d9534f"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect width="12" height="8" x="6" y="14" rx="1"/></svg></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 148px 1fr 150px 92px 130px 118px 140px 44px; gap: 12px; padding: 13px 20px; border-bottom: 1px solid #f0f3f1; align-items: center; background: #fbfcfb">
+          <div><div class="num td" style="font-weight: 700">#20260909-013</div><div class="num" style="font-size: 11.5px; color: #8a938a">13:10</div></div>
+          <div style="display: flex; align-items: center; gap: 10px; min-width: 0">
+            <div style="width: 32px; height: 32px; flex: 0 0 32px; border-radius: 999px; background: #eef2fb; color: #4a63a8; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700">JT</div>
+            <div style="min-width: 0">
+              <div class="td" style="font-weight: 600">Jasur Toshmatov</div>
+              <div class="num" style="font-size: 11.5px; color: #8a938a">+998 (91) 234-56-78</div>
+            </div>
+            <span class="tag" style="background: #e6f5ee; color: #1f7c52">Sovg&rsquo;a</span>
+          </div>
+          <div class="td" style="color: #566056">Dr. Yusupova</div>
+          <div class="num td" style="text-align: center">6</div>
+          <div class="num td" style="text-align: right; font-weight: 700">890 000</div>
+          <div class="num td" style="text-align: right; color: #566056">89 000</div>
+          <div style="display: flex; gap: 4px; flex-wrap: wrap"><span class="tag" style="background: #e6f5ee; color: #1f7c52">Bajarilgan</span><span class="tag" style="background: #f0f3f1; color: #566056">Karta</span></div>
+          <div style="display: flex; justify-content: flex-end; color: #8a938a"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect width="12" height="8" x="6" y="14" rx="1"/></svg></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 148px 1fr 150px 92px 130px 118px 140px 44px; gap: 12px; padding: 13px 20px; border-bottom: 1px solid #f0f3f1; align-items: center">
+          <div><div class="num td" style="font-weight: 700">#20260909-012</div><div class="num" style="font-size: 11.5px; color: #8a938a">12:35</div></div>
+          <div style="display: flex; align-items: center; gap: 10px; min-width: 0">
+            <div style="width: 32px; height: 32px; flex: 0 0 32px; border-radius: 999px; background: #fdf3e2; color: #b57a12; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700">ME</div>
+            <div style="min-width: 0">
+              <div class="td" style="font-weight: 600">Malika Ergasheva</div>
+              <div class="num" style="font-size: 11.5px; color: #8a938a">+998 (93) 345-67-89</div>
+            </div>
+          </div>
+          <div class="td" style="color: #566056">Dr. Aliyev</div>
+          <div class="num td" style="text-align: center">12</div>
+          <div class="num td" style="text-align: right; font-weight: 700">2 100 000</div>
+          <div class="num td" style="text-align: right; color: #566056">262 500</div>
+          <div style="display: flex; gap: 4px; flex-wrap: wrap"><span class="tag" style="background: #e6f5ee; color: #1f7c52">Bajarilgan</span><span class="tag" style="background: #eef2fb; color: #4a63a8">Aralash</span></div>
+          <div style="display: flex; justify-content: flex-end; color: #8a938a"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect width="12" height="8" x="6" y="14" rx="1"/></svg></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 148px 1fr 150px 92px 130px 118px 140px 44px; gap: 12px; padding: 13px 20px; border-bottom: 1px solid #f0f3f1; align-items: center; background: #fbfcfb">
+          <div><div class="num td" style="font-weight: 700">#20260909-011</div><div class="num" style="font-size: 11.5px; color: #8a938a">11:58</div></div>
+          <div style="display: flex; align-items: center; gap: 10px; min-width: 0">
+            <div style="width: 32px; height: 32px; flex: 0 0 32px; border-radius: 999px; background: #f0f3f1; color: #566056; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700">SN</div>
+            <div style="min-width: 0">
+              <div class="td" style="font-weight: 600">Sardor Nazarov</div>
+              <div class="num" style="font-size: 11.5px; color: #8a938a">+998 (97) 456-78-90</div>
+            </div>
+            <span class="tag" style="background: #f0f3f1; color: #566056">Dastavka</span>
+          </div>
+          <div class="td" style="color: #8a938a">&mdash;</div>
+          <div class="num td" style="text-align: center">4</div>
+          <div class="num td" style="text-align: right; font-weight: 700">640 000</div>
+          <div class="num td" style="text-align: right; color: #8a938a">&mdash;</div>
+          <div style="display: flex; gap: 4px; flex-wrap: wrap"><span class="tag" style="background: #e6f5ee; color: #1f7c52">Bajarilgan</span><span class="tag" style="background: #f0f3f1; color: #566056">Terminal</span></div>
+          <div style="display: flex; justify-content: flex-end; color: #8a938a"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect width="12" height="8" x="6" y="14" rx="1"/></svg></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 148px 1fr 150px 92px 130px 118px 140px 44px; gap: 12px; padding: 13px 20px; border-bottom: 1px solid #f0f3f1; align-items: center; opacity: 0.62">
+          <div><div class="num td" style="font-weight: 700; text-decoration: line-through">#20260909-010</div><div class="num" style="font-size: 11.5px; color: #8a938a">11:20</div></div>
+          <div style="display: flex; align-items: center; gap: 10px; min-width: 0">
+            <div style="width: 32px; height: 32px; flex: 0 0 32px; border-radius: 999px; background: #f0f3f1; color: #566056; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700">GA</div>
+            <div style="min-width: 0">
+              <div class="td" style="font-weight: 600">Gulnora Abdullayeva</div>
+              <div class="num" style="font-size: 11.5px; color: #8a938a">+998 (94) 567-89-01</div>
+            </div>
+          </div>
+          <div class="td" style="color: #566056">Dr. Yusupova</div>
+          <div class="num td" style="text-align: center">2</div>
+          <div class="num td" style="text-align: right; font-weight: 700">320 000</div>
+          <div class="num td" style="text-align: right; color: #8a938a">&mdash;</div>
+          <div style="display: flex; gap: 4px"><span class="tag" style="background: #fbecec; color: #b0403c">Bekor qilingan</span></div>
+          <div></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 148px 1fr 150px 92px 130px 118px 140px 44px; gap: 12px; padding: 13px 20px; border-bottom: 1px solid #f0f3f1; align-items: center; background: #fbfcfb">
+          <div><div class="num td" style="font-weight: 700">#20260909-009</div><div class="num" style="font-size: 11.5px; color: #8a938a">10:47</div></div>
+          <div style="display: flex; align-items: center; gap: 10px; min-width: 0">
+            <div style="width: 32px; height: 32px; flex: 0 0 32px; border-radius: 999px; background: #e6f5ee; color: #1f7c52; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700">BX</div>
+            <div style="min-width: 0">
+              <div class="td" style="font-weight: 600">Bekzod Xolmatov</div>
+              <div class="num" style="font-size: 11.5px; color: #8a938a">+998 (99) 678-90-12</div>
+            </div>
+            <span class="tag" style="background: #f0f3f1; color: #566056">Xodim</span>
+          </div>
+          <div class="td" style="color: #8a938a">&mdash;</div>
+          <div class="num td" style="text-align: center">3</div>
+          <div class="num td" style="text-align: right; font-weight: 700">480 000</div>
+          <div class="num td" style="text-align: right; color: #8a938a">&mdash;</div>
+          <div style="display: flex; gap: 4px; flex-wrap: wrap"><span class="tag" style="background: #e6f5ee; color: #1f7c52">Bajarilgan</span><span class="tag" style="background: #f0f3f1; color: #566056">Naqd</span></div>
+          <div style="display: flex; justify-content: flex-end; color: #8a938a"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect width="12" height="8" x="6" y="14" rx="1"/></svg></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 148px 1fr 150px 92px 130px 118px 140px 44px; gap: 12px; padding: 13px 20px; border-bottom: 1px solid #f0f3f1; align-items: center">
+          <div><div class="num td" style="font-weight: 700">#20260909-008</div><div class="num" style="font-size: 11.5px; color: #8a938a">10:12</div></div>
+          <div style="display: flex; align-items: center; gap: 10px; min-width: 0">
+            <div style="width: 32px; height: 32px; flex: 0 0 32px; border-radius: 999px; background: #fbecec; color: #b0403c; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700">NS</div>
+            <div style="min-width: 0">
+              <div class="td" style="font-weight: 600">Nigora Sobirova</div>
+              <div class="num" style="font-size: 11.5px; color: #8a938a">+998 (90) 789-01-23</div>
+            </div>
+            <span class="tag" style="background: #fbecec; color: #b0403c">Muddati o&rsquo;tgan 620 000</span>
+          </div>
+          <div class="td" style="color: #566056">Dr. Aliyev</div>
+          <div class="num td" style="text-align: center">5</div>
+          <div class="num td" style="text-align: right; font-weight: 700">1 240 000</div>
+          <div class="num td" style="text-align: right; color: #566056">155 000</div>
+          <div style="display: flex; gap: 4px; flex-wrap: wrap"><span class="tag" style="background: #e6f5ee; color: #1f7c52">Bajarilgan</span><span class="tag" style="background: #f0f3f1; color: #566056">Naqd</span></div>
+          <div style="display: flex; justify-content: flex-end; color: #8a938a"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect width="12" height="8" x="6" y="14" rx="1"/></svg></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 148px 1fr 150px 92px 130px 118px 140px 44px; gap: 12px; padding: 13px 20px; align-items: center; background: #fbfcfb">
+          <div><div class="num td" style="font-weight: 700">#20260909-007</div><div class="num" style="font-size: 11.5px; color: #8a938a">09:38</div></div>
+          <div style="display: flex; align-items: center; gap: 10px; min-width: 0">
+            <div style="width: 32px; height: 32px; flex: 0 0 32px; border-radius: 999px; background: #eef2fb; color: #4a63a8; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700">AT</div>
+            <div style="min-width: 0">
+              <div class="td" style="font-weight: 600">Aziza Tursunova</div>
+              <div class="num" style="font-size: 11.5px; color: #8a938a">+998 (95) 890-12-34</div>
+            </div>
+          </div>
+          <div class="td" style="color: #566056">Dr. Yusupova</div>
+          <div class="num td" style="text-align: center">9</div>
+          <div class="num td" style="text-align: right; font-weight: 700">1 560 000</div>
+          <div class="num td" style="text-align: right; color: #566056">156 000</div>
+          <div style="display: flex; gap: 4px; flex-wrap: wrap"><span class="tag" style="background: #e6f5ee; color: #1f7c52">Bajarilgan</span><span class="tag" style="background: #f0f3f1; color: #566056">Karta</span></div>
+          <div style="display: flex; justify-content: flex-end; color: #8a938a"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect width="12" height="8" x="6" y="14" rx="1"/></svg></div>
+        </div>
+      </div>
+
+      <div style="padding: 14px 20px; border-top: 1px solid #e4e8e4; display: flex; align-items: center; gap: 10px; background: #fbfcfb">
+        <span style="font-size: 12.5px; color: #8a938a">1&ndash;8 / 34</span>
+        <div style="flex: 1 1 auto"></div>
+        <span class="chip" style="height: 32px">Oldingi</span>
+        <span class="chip on" style="height: 32px; width: 32px; justify-content: center; padding: 0">1</span>
+        <span class="chip" style="height: 32px; width: 32px; justify-content: center; padding: 0">2</span>
+        <span class="chip" style="height: 32px; width: 32px; justify-content: center; padding: 0">3</span>
+        <span class="chip" style="height: 32px">Keyingi</span>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

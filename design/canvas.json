@@ -1,0 +1,83 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1340,
+      "title": "Statistika — desktop shell"
+    },
+    {
+      "file": "NewOrder.dc.html",
+      "x": 1560,
+      "y": 0,
+      "w": 1440,
+      "h": 1100,
+      "title": "Yangi buyurtma"
+    },
+    {
+      "file": "Orders.dc.html",
+      "x": 0,
+      "y": 1480,
+      "w": 1440,
+      "h": 980,
+      "title": "Buyurtmalar — jadval"
+    },
+    {
+      "file": "ClientProfile.dc.html",
+      "x": 1560,
+      "y": 1480,
+      "w": 1440,
+      "h": 1140,
+      "title": "Mijoz kartasi 360°"
+    },
+    {
+      "file": "Login.dc.html",
+      "x": 0,
+      "y": 2760,
+      "w": 1440,
+      "h": 880,
+      "title": "Kirish"
+    },
+    {
+      "file": "Mobile.dc.html",
+      "x": 1560,
+      "y": 2760,
+      "w": 860,
+      "h": 900,
+      "title": "Mobil — statistika va menyu"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "brief",
+      "x": 0,
+      "y": -220,
+      "w": 620,
+      "text": "Doctor Ali — Qabulxona\nNext.js portining vizual tili.\n\nBarcha rang, shrift, radius va oraliqlar Flutter loyihasidan aynan olingan:\nprimary #2E9E6B · radius 6/10/14/18/24 · Plus Jakarta Sans · kartochka padding 20px."
+    },
+    {
+      "id": "note-density",
+      "x": 1560,
+      "y": -220,
+      "w": 560,
+      "text": "Zichlik: qabulxona ekranida imkon qadar ko'p ma'lumot.\nJadval qatori 13px padding, KPI ikonka chipi 34×34,\nsidebar elementi 42px — Flutter o'lchamlari saqlangan."
+    },
+    {
+      "id": "note-money",
+      "x": 0,
+      "y": 1380,
+      "w": 560,
+      "text": "Pul har doim tabular-nums bilan — ustunda 1 250 000\nva 980 000 bir-birining tagida to'g'ri tekislanadi."
+    },
+    {
+      "id": "note-mobile",
+      "x": 1560,
+      "y": 3700,
+      "w": 560,
+      "text": "Mobil: jadval kartochkaga aylanadi, sidebar drawer bo'ladi.\nTegish maydonlari ≥44px. Soxta status bar chizilmagan —\nuni haqiqiy qurilma o'zi chizadi."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

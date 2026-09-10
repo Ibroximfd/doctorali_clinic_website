@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.github
+.husky
+design
+*.md
+!README.md
+.env*
+!.env.example
+Dockerfile
+.dockerignore

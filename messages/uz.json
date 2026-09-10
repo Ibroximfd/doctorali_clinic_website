@@ -1,0 +1,26 @@
+{
+  "app": {
+    "name": "Doctor Ali — Qabulxona",
+    "shortName": "Qabulxona"
+  },
+  "common": {
+    "retry": "Qayta urinish",
+    "cancel": "Bekor qilish",
+    "save": "Saqlash",
+    "close": "Yopish",
+    "back": "Orqaga",
+    "loading": "Yuklanmoqda…",
+    "search": "Qidirish…"
+  },
+  "error": {
+    "title": "Nimadir noto'g'ri ketdi",
+    "message": "Sahifani yuklashda xatolik yuz berdi. Qayta urinib ko'ring.",
+    "reload": "Qayta yuklash",
+    "toDashboard": "Bosh sahifaga"
+  },
+  "notFound": {
+    "title": "Sahifa topilmadi",
+    "message": "Bu manzilda sahifa yo'q. Havola eskirgan bo'lishi mumkin.",
+    "toDashboard": "Bosh sahifaga"
+  }
+}
