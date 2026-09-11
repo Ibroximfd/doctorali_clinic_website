@@ -16,14 +16,10 @@ import { PaginationBar } from "@/shared/components/data-display/pagination-bar";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { ListSkeleton } from "@/shared/components/data-display/list-skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select";
-import { shortDateTime } from "@/shared/lib/format/date";
+import { DateFilter } from "@/shared/components/data-display/date-filter";
+import { FilterBar, FilterSelect } from "@/shared/components/data-display/filter-bar";
+import type { DateRange } from "@/shared/domain/date-range";
+import { addDays, shortDateTime } from "@/shared/lib/format/date";
 import { cn } from "@/shared/lib/utils";
 
 import type { MovementFilter } from "../api/warehouse-api";
@@ -40,7 +36,6 @@ import {
 } from "../types/movement";
 
 const PAGE_SIZE = 20;
-const ALL = "__all__";
 
 const ICON: Readonly<Record<StockMovementType, LucideIcon>> = {
   receipt: ArrowDownLeft,
@@ -63,35 +58,46 @@ const ICON: Readonly<Record<StockMovementType, LucideIcon>> = {
  */
 export function MovementsList({ productId }: { productId?: string | null }) {
   const [type, setType] = useState<StockMovementType | null>(null);
+  const [range, setRange] = useState<DateRange | null>(null);
   const [page, setPage] = useState(1);
 
   const filter = useMemo<MovementFilter>(
-    () => ({ productId: productId ?? null, type }),
-    [productId, type],
+    () => ({
+      productId: productId ?? null,
+      type,
+      dateFrom: range?.start ?? null,
+      // The app's range end is exclusive; the API's `date_to` is inclusive.
+      dateTo: range ? addDays(range.end, -1) : null,
+    }),
+    [productId, type, range],
   );
   const list = useMovementsQuery(filter, page);
 
   return (
     <div className="flex flex-col gap-3">
-      <Select
-        value={type ?? ALL}
-        onValueChange={(value) => {
-          setType(value === ALL ? null : (value as StockMovementType));
-          setPage(1);
-        }}
-      >
-        <SelectTrigger className="h-[38px] w-[220px]">
-          <SelectValue placeholder="Barcha harakatlar" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL}>Barcha harakatlar</SelectItem>
-          {FILTERABLE_MOVEMENT_TYPES.map((option) => (
-            <SelectItem key={option} value={option}>
-              {MOVEMENT_TYPE_LABEL[option]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <FilterBar>
+        <DateFilter
+          value={range}
+          onChange={(next) => {
+            setRange(next);
+            setPage(1);
+          }}
+        />
+        <FilterSelect
+          label="Harakat turi"
+          value={type}
+          onChange={(next) => {
+            setType(next);
+            setPage(1);
+          }}
+          options={FILTERABLE_MOVEMENT_TYPES.map((option) => ({
+            value: option,
+            label: MOVEMENT_TYPE_LABEL[option],
+          }))}
+          allLabel="Barcha harakatlar"
+          width="w-[210px]"
+        />
+      </FilterBar>
 
       {list.error && !list.data ? (
         <ErrorState error={list.error} onRetry={() => void list.refetch()} />

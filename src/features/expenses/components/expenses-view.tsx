@@ -5,7 +5,8 @@ import { useMemo, useState } from "react";
 
 import { AppCard } from "@/shared/components/data-display/app-card";
 import { ActiveFilters } from "@/shared/components/data-display/active-filters";
-import { DateRangePicker } from "@/shared/components/data-display/date-range-picker";
+import { DateFilter } from "@/shared/components/data-display/date-filter";
+import { FilterBar, FilterSelect } from "@/shared/components/data-display/filter-bar";
 import { ListSkeleton } from "@/shared/components/data-display/list-skeleton";
 import { PageContainer } from "@/shared/components/data-display/page-container";
 import { PaginationBar } from "@/shared/components/data-display/pagination-bar";
@@ -23,15 +24,13 @@ import {
   AlertDialogTitle,
 } from "@/shared/components/ui/alert-dialog";
 import { Button } from "@/shared/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select";
 import type { DateRange } from "@/shared/domain/date-range";
 import { rangeLabel } from "@/shared/domain/date-range-label";
+import {
+  PAYMENT_TYPES,
+  PAYMENT_TYPE_LABEL,
+  type PaymentType,
+} from "@/shared/domain/payment-type";
 import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
 import { addDays, dayMonth, shortDate } from "@/shared/lib/format/date";
 import { money } from "@/shared/lib/format/money";
@@ -55,13 +54,13 @@ import { ExpenseFormDialog } from "./expense-form-dialog";
 import { ExpenseSummaryStrip } from "./expense-summary-strip";
 
 const PAGE_SIZE = 20;
-const ALL = "__all__";
 
 /** "Xarajatlar" — what left the tills, and which drawer it came off. */
 export function ExpensesView() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<ExpenseCategory | null>(null);
   const [range, setRange] = useState<DateRange | null>(null);
+  const [paymentType, setPaymentType] = useState<PaymentType | null>(null);
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
@@ -73,12 +72,13 @@ export function ExpensesView() {
     () => ({
       search: debouncedSearch,
       category,
+      paymentType,
       dateFrom: range?.start ?? null,
       // The app's range end is exclusive; the API's `date_to` is inclusive.
       dateTo: range ? addDays(range.end, -1) : null,
       ordering: "-expense_date",
     }),
-    [debouncedSearch, category, range],
+    [debouncedSearch, category, paymentType, range],
   );
 
   const list = useExpensesQuery(filter, page);
@@ -94,43 +94,51 @@ export function ExpensesView() {
 
   return (
     <PageContainer className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
+      <FilterBar
+        extraCount={paymentType === null ? 0 : 1}
+        extra={
+          <FilterSelect
+            label="To'lov turi"
+            value={paymentType}
+            onChange={resetPage(setPaymentType)}
+            options={PAYMENT_TYPES.map((type) => ({
+              value: type,
+              label: PAYMENT_TYPE_LABEL[type],
+            }))}
+            allLabel="Barcha to'lovlar"
+          />
+        }
+        action={
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setFormOpen(true);
+            }}
+          >
+            <Plus className="size-4" aria-hidden />
+            Xarajat qo&rsquo;shish
+          </Button>
+        }
+      >
         <SearchField
           value={search}
           onChange={resetPage(setSearch)}
           placeholder="Izoh bo'yicha qidirish…"
-          className="w-full sm:w-[280px]"
+          className="w-full sm:w-[260px]"
         />
-        <Select
-          value={category ?? ALL}
-          onValueChange={resetPage((value: string) =>
-            setCategory(value === ALL ? null : (value as ExpenseCategory)),
-          )}
-        >
-          <SelectTrigger className="w-[210px]" aria-label="Turkum">
-            <SelectValue placeholder="Barcha turkumlar" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Barcha turkumlar</SelectItem>
-            {EXPENSE_CATEGORIES.map((c) => (
-              <SelectItem key={c} value={c}>
-                {EXPENSE_CATEGORY_LABEL[c]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <DateRangePicker value={range} onChange={resetPage(setRange)} />
-        <div className="flex-1" />
-        <Button
-          onClick={() => {
-            setEditing(null);
-            setFormOpen(true);
-          }}
-        >
-          <Plus className="size-4" aria-hidden />
-          Xarajat qo&rsquo;shish
-        </Button>
-      </div>
+        <DateFilter value={range} onChange={resetPage(setRange)} />
+        <FilterSelect
+          label="Turkum"
+          value={category}
+          onChange={resetPage(setCategory)}
+          options={EXPENSE_CATEGORIES.map((value) => ({
+            value,
+            label: EXPENSE_CATEGORY_LABEL[value],
+          }))}
+          allLabel="Barcha turkumlar"
+          width="w-[200px]"
+        />
+      </FilterBar>
 
       <ActiveFilters
         filters={[

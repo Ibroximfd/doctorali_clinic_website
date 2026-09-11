@@ -14,7 +14,7 @@ import {
 } from "recharts";
 
 import { AppCard } from "@/shared/components/data-display/app-card";
-import { DateRangePicker } from "@/shared/components/data-display/date-range-picker";
+import { DateFilter } from "@/shared/components/data-display/date-filter";
 import { SectionHeader } from "@/shared/components/data-display/section-header";
 import { StatCard } from "@/shared/components/data-display/stat-card";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
@@ -47,7 +47,7 @@ export function AttendanceStatsView() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <DateRangePicker value={range} onChange={setRange} />
+        <DateFilter value={range} onChange={setRange} />
         <p className="text-caption text-text-tertiary">
           Ko&rsquo;rsatilmasa — shu oy boshidan bugungacha
         </p>

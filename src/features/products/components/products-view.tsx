@@ -10,21 +10,17 @@ import { AppCard } from "@/shared/components/data-display/app-card";
 import { ListSkeleton } from "@/shared/components/data-display/list-skeleton";
 import { PageContainer } from "@/shared/components/data-display/page-container";
 import { PaginationBar } from "@/shared/components/data-display/pagination-bar";
+import { DateFilter } from "@/shared/components/data-display/date-filter";
+import { FilterBar, SortSelect } from "@/shared/components/data-display/filter-bar";
 import { PeriodSelector } from "@/shared/components/data-display/period-selector";
 import { SearchField } from "@/shared/components/data-display/search-field";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { ErrorState } from "@/shared/components/feedback/error-state";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select";
-import type { StatPeriod } from "@/shared/domain/date-range";
+import type { DateRange } from "@/shared/domain/date-range";
+import { periodForRange, resolveRange } from "@/shared/domain/date-range";
 import { formatUnits } from "@/shared/domain/packaging";
 import { money } from "@/shared/lib/format/money";
-import { resolveMediaUrl } from "@/shared/lib/media";
+import { MediaImage } from "@/shared/components/ui/media-image";
 import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
 
 const ORDERINGS = [
@@ -44,13 +40,17 @@ const PAGE_SIZE = 20;
  * only view of it reception actually needs: what moved, and for how much.
  */
 export function ProductsView() {
-  const [period, setPeriod] = useState<StatPeriod>("monthly");
+  const [range, setRange] = useState<DateRange>(() => resolveRange("monthly"));
   const [ordering, setOrdering] = useState<string>("-revenue");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
   const debouncedSearch = useDebouncedValue(search);
-  const query = useMemo<StatsQuery>(() => ({ period }), [period]);
+  const period = periodForRange(range);
+  const query = useMemo<StatsQuery>(
+    () => ({ period: periodForRange(range), custom: range }),
+    [range],
+  );
 
   const { data, error, isPending, isFetching, refetch } = useProductStatsQuery({
     query,
@@ -68,28 +68,34 @@ export function ProductsView() {
 
   return (
     <PageContainer className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
+      <FilterBar
+        action={
+          <SortSelect
+            value={ordering}
+            onChange={reset(setOrdering)}
+            options={ORDERINGS}
+          />
+        }
+      >
         <SearchField
           value={search}
           onChange={reset(setSearch)}
           placeholder="Mahsulot nomi…"
-          className="w-full sm:w-[280px]"
+          className="w-full sm:w-[260px]"
         />
-        <PeriodSelector value={period} onChange={reset(setPeriod)} granularity />
-        <div className="flex-1" />
-        <Select value={ordering} onValueChange={reset(setOrdering)}>
-          <SelectTrigger className="w-[190px]" aria-label="Saralash">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {ORDERINGS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+        <div className="hidden md:block">
+          <PeriodSelector
+            value={period}
+            onChange={(next) => reset(setRange)(resolveRange(next, { custom: range }))}
+            granularity
+          />
+        </div>
+        <DateFilter
+          value={range}
+          onChange={(next) => next && reset(setRange)(next)}
+          clearable={false}
+        />
+      </FilterBar>
 
       {error && !data ? (
         <AppCard padded={false}>
@@ -135,8 +141,6 @@ export function ProductsView() {
 }
 
 function ProductStatCard({ product }: { product: ProductStat }) {
-  const image = resolveMediaUrl(product.imageUrl);
-
   return (
     <AppCard className="flex flex-col gap-3">
       <div className="flex items-start gap-3">
@@ -144,9 +148,13 @@ function ProductStatCard({ product }: { product: ProductStat }) {
           className="bg-surface-alt flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-sm"
           aria-hidden
         >
-          {image ? (
-            // eslint-disable-next-line @next/next/no-img-element -- arbitrary-origin catalog thumbnail
-            <img src={image} alt="" loading="lazy" className="size-full object-cover" />
+          {product.imageUrl ? (
+            <MediaImage
+              src={product.imageUrl}
+              alt=""
+              size={56}
+              className="size-full object-cover"
+            />
           ) : (
             <ImageOff className="text-text-tertiary size-6" />
           )}

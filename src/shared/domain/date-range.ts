@@ -98,3 +98,18 @@ export function isSameRange(a: DateRange | null, b: DateRange | null): boolean {
   if (a === null || b === null) return a === b;
   return a.start.getTime() === b.start.getTime() && a.end.getTime() === b.end.getTime();
 }
+
+/**
+ * The named period a range IS, or `"custom"` when it matches none.
+ *
+ * The filters work in ranges — one control, one source of truth — while the
+ * statistics API still wants the period's NAME whenever there is one, because
+ * that is what decides how the server buckets the chart. This is the join
+ * between the two.
+ */
+export function periodForRange(range: DateRange, now?: TashkentDate): StatPeriod {
+  for (const period of ["daily", "weekly", "monthly", "yearly"] as const) {
+    if (isSameRange(resolveRange(period, { now }), range)) return period;
+  }
+  return "custom";
+}

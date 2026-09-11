@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, ImageOff, Minus, Package, Plus, Store } from "lucide-react";
+import { memo } from "react";
 
 import {
   formatProductUnits,
@@ -12,9 +13,9 @@ import {
   saleStep,
   type Product,
 } from "@/features/products/types/product";
+import { MediaImage } from "@/shared/components/ui/media-image";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { money } from "@/shared/lib/format/money";
-import { resolveMediaUrl } from "@/shared/lib/media";
 import { cn } from "@/shared/lib/utils";
 
 /**
@@ -31,8 +32,13 @@ import { cn } from "@/shared/lib/utils";
  * but its row shows no price rather than nine unit prices multiplied together —
  * the box is routinely cheaper than that, and inventing the number here puts a
  * figure on the screen that the order will not be billed at.
+ *
+ * Memoised, and the callbacks take the PRODUCT rather than closing over it, so
+ * the parent can hand every card the same two stable functions. Sixty cards
+ * used to re-render on every stepper click anywhere in the basket — each with
+ * its tooltip trees — which is what made a fast typist's clicks queue up.
  */
-export function ProductPickCard({
+export const ProductPickCard = memo(function ProductPickCard({
   product,
   quantityInCart,
   onAdd,
@@ -42,12 +48,11 @@ export function ProductPickCard({
   product: Product;
   quantityInCart: number;
   /** Adds `units` base units, or one sale step when called with nothing. */
-  onAdd: (units?: number) => void;
-  onQuantityChange: (quantity: number) => void;
+  onAdd: (product: Product, units?: number) => void;
+  onQuantityChange: (product: Product, quantity: number) => void;
   /** Marks the keyboard cursor's row so Enter's target is never a guess. */
   highlighted?: boolean;
 }) {
-  const image = resolveMediaUrl(product.imageUrl);
   const out = isOutOfStock(product);
   const low = isLowStock(product);
   const limit = maxSellableQuantity(product);
@@ -68,11 +73,16 @@ export function ProductPickCard({
   const canAddBox = !out && boxed && (remaining === null || remaining >= size);
   const canQuickAdd = !out && (remaining === null || remaining >= step);
 
+  /** A package-only product steps by the box, never by 1. */
+  function stepTo(quantity: number) {
+    onQuantityChange(product, Math.max(0, Math.round(quantity / step) * step));
+  }
+
   return (
     <div
       data-highlighted={highlighted ? "" : undefined}
       className={cn(
-        "group bg-surface relative flex flex-col overflow-hidden rounded-md border text-left transition-all",
+        "group bg-surface relative flex flex-col overflow-hidden rounded-md border text-left transition-[border-color,box-shadow,opacity]",
         out
           ? "border-border opacity-60"
           : inCart
@@ -84,7 +94,7 @@ export function ProductPickCard({
       <button
         type="button"
         disabled={!canQuickAdd}
-        onClick={() => onAdd()}
+        onClick={() => onAdd(product)}
         aria-label={
           packageOnly
             ? `${product.name} — 1 ${product.packageLabel} qo'shish`
@@ -100,9 +110,13 @@ export function ProductPickCard({
           className="bg-surface-alt relative flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-sm"
           aria-hidden
         >
-          {image ? (
-            // eslint-disable-next-line @next/next/no-img-element -- arbitrary-origin catalog thumbnail in a long grid
-            <img src={image} alt="" loading="lazy" className="size-full object-cover" />
+          {product.imageUrl ? (
+            <MediaImage
+              src={product.imageUrl}
+              alt=""
+              size={48}
+              className="size-full object-cover"
+            />
           ) : (
             <ImageOff className="text-text-tertiary size-5" />
           )}
@@ -153,7 +167,7 @@ export function ProductPickCard({
             enabled={canAddUnit}
             emphasized={!boxed}
             disabledHint="Omborda qolmadi"
-            onClick={() => onAdd(1)}
+            onClick={() => onAdd(product, 1)}
           />
         )}
         {boxed && (
@@ -170,17 +184,14 @@ export function ProductPickCard({
                 ? "Omborda qolmadi"
                 : `Butun ${product.packageLabel} uchun omborda yetarli emas`
             }
-            onClick={() => onAdd(size)}
+            onClick={() => onAdd(product, size)}
           />
         )}
       </div>
 
       {inCart && (
         <div className="border-border bg-primary-soft/40 flex items-center gap-1 border-t px-2 py-1.5">
-          <StepButton
-            label="Kamaytirish"
-            onClick={() => onQuantityChange(quantityInCart - step)}
-          >
+          <StepButton label="Kamaytirish" onClick={() => stepTo(quantityInCart - step)}>
             <Minus className="size-4" />
           </StepButton>
           <span className="text-title-sm tabular flex-1 text-center">
@@ -189,7 +200,7 @@ export function ProductPickCard({
           <StepButton
             label="Ko'paytirish"
             disabled={remaining !== null && remaining < step}
-            onClick={() => onQuantityChange(quantityInCart + step)}
+            onClick={() => stepTo(quantityInCart + step)}
           >
             <Plus className="size-4" />
           </StepButton>
@@ -197,7 +208,7 @@ export function ProductPickCard({
       )}
     </div>
   );
-}
+});
 
 /**
  * One "what you get · what it costs" button. The box row is emphasized so the

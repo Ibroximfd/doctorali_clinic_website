@@ -8,37 +8,35 @@ import { ClientSearchField } from "@/features/clients/components/client-search-f
 import { clientDetailPath } from "@/config/routes";
 import { ActiveFilters } from "@/shared/components/data-display/active-filters";
 import { AppCard } from "@/shared/components/data-display/app-card";
-import { DateInput } from "@/shared/components/form/date-input";
 import { ListSkeleton } from "@/shared/components/data-display/list-skeleton";
 import { PageContainer } from "@/shared/components/data-display/page-container";
 import { PaginationBar } from "@/shared/components/data-display/pagination-bar";
 import { SearchField } from "@/shared/components/data-display/search-field";
+import { DateFilter } from "@/shared/components/data-display/date-filter";
+import { FilterBar, FilterSelect } from "@/shared/components/data-display/filter-bar";
+import { DoctorFilter } from "@/features/doctors/components/doctor-filter";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { Button } from "@/shared/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select";
+import type { DateRange } from "@/shared/domain/date-range";
+import { resolveRange } from "@/shared/domain/date-range";
+import { activeRangeLabel, isSingleDay } from "@/shared/domain/date-range-label";
 import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
 import { useMediaQuery } from "@/shared/hooks/use-media-query";
-import {
-  nowTashkent,
-  shortDate,
-  startOfDay,
-  type TashkentDate,
-} from "@/shared/lib/format/date";
+import { addDays } from "@/shared/lib/format/date";
 import { phoneToApi } from "@/shared/lib/format/phone";
 
 import type { AppointmentFilter } from "../api/appointments-api";
 import { useAppointmentsQuery } from "../hooks/use-appointments";
 import {
+  APPOINTMENT_PURPOSES,
   APPOINTMENT_STATUSES,
   APPOINTMENT_STATUS_LABEL,
+  PURPOSE_LABEL,
+  VISIT_TYPE_LABEL,
+  type AppointmentPurpose,
   type AppointmentStatus,
+  type VisitType,
 } from "../types/appointment";
 import { AppointmentDialogsProvider, useAppointmentDialogs } from "./appointment-dialogs";
 import { AppointmentRow } from "./appointment-row";
@@ -46,7 +44,6 @@ import { AppointmentTableRow, AppointmentsTableHeader } from "./appointment-tabl
 import { TodayAppointmentsCard } from "./today-appointments-card";
 
 const PAGE_SIZE = 20;
-const ALL = "__all__";
 
 /** "Tashriflar" — today's queue on top, the searchable history under it. */
 export function AppointmentsView() {
@@ -63,16 +60,35 @@ function AppointmentsBody() {
   const isMobile = useMediaQuery("(max-width: 63.98rem)");
 
   // Today by default: the list is a working queue first and an archive second.
-  const [date, setDate] = useState<TashkentDate | null>(() => startOfDay(nowTashkent()));
+  const [range, setRange] = useState<DateRange | null>(() => resolveRange("daily"));
   const [status, setStatus] = useState<AppointmentStatus | null>(null);
+  const [doctorId, setDoctorId] = useState<string | null>(null);
+  const [purpose, setPurpose] = useState<AppointmentPurpose | null>(null);
+  const [visitType, setVisitType] = useState<VisitType | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
   const debouncedSearch = useDebouncedValue(search);
 
+  /*
+   * One day goes out as `date=`, a span as `date_from`/`date_to` — the backend
+   * has both, and a queue that could only ever show ONE day meant answering
+   * "kim shu hafta keladi?" by clicking through seven of them.
+   */
   const filter = useMemo<AppointmentFilter>(
-    () => ({ date, status, search: debouncedSearch }),
-    [date, status, debouncedSearch],
+    () => ({
+      ...(range && isSingleDay(range)
+        ? { date: range.start }
+        : range
+          ? { dateFrom: range.start, dateTo: addDays(range.end, -1) }
+          : {}),
+      status,
+      doctorId,
+      purpose,
+      visitType,
+      search: debouncedSearch,
+    }),
+    [range, status, doctorId, purpose, visitType, debouncedSearch],
   );
 
   const list = useAppointmentsQuery(filter, page);
@@ -120,53 +136,70 @@ function AppointmentsBody() {
 
       <TodayAppointmentsCard showAllLink={false} />
 
-      <div className="flex flex-wrap items-center gap-2">
+      <FilterBar
+        extraCount={[doctorId, purpose, visitType].filter((v) => v !== null).length}
+        extra={
+          <>
+            <DoctorFilter value={doctorId} onChange={reset(setDoctorId)} />
+            <FilterSelect
+              label="Maqsad"
+              value={purpose}
+              onChange={reset(setPurpose)}
+              options={APPOINTMENT_PURPOSES.map((option) => ({
+                value: option,
+                label: PURPOSE_LABEL[option],
+              }))}
+              allLabel="Barcha maqsadlar"
+              width="w-[180px]"
+            />
+            <FilterSelect
+              label="Tashrif turi"
+              value={visitType}
+              onChange={reset(setVisitType)}
+              options={[
+                { value: "scheduled" as const, label: VISIT_TYPE_LABEL.scheduled },
+                { value: "walk_in" as const, label: VISIT_TYPE_LABEL.walk_in },
+              ]}
+              allLabel="Barcha tashriflar"
+              width="w-[180px]"
+            />
+          </>
+        }
+        action={
+          <span className="text-caption text-text-tertiary tabular">
+            Jami {list.data?.count ?? 0} ta tashrif
+          </span>
+        }
+      >
         <SearchField
           value={search}
           onChange={reset(setSearch)}
           placeholder="Mijoz ismi yoki telefon…"
-          className="w-full sm:w-[280px]"
+          className="w-full sm:w-[260px]"
         />
-
-        <DateInput
-          value={date}
-          onChange={reset(setDate)}
-          placeholder="Barcha sanalar"
-          className="h-[38px]"
+        <DateFilter value={range} onChange={reset(setRange)} />
+        <FilterSelect
+          label="Holat"
+          value={status}
+          onChange={reset(setStatus)}
+          options={APPOINTMENT_STATUSES.map((option) => ({
+            value: option,
+            label: APPOINTMENT_STATUS_LABEL[option],
+          }))}
+          allLabel="Barcha holatlar"
+          width="w-[180px]"
         />
-
-        <Select
-          value={status ?? ALL}
-          onValueChange={reset((value: string) =>
-            setStatus(value === ALL ? null : (value as AppointmentStatus)),
-          )}
-        >
-          <SelectTrigger className="h-[38px] w-[180px]">
-            <SelectValue placeholder="Barcha holatlar" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Barcha holatlar</SelectItem>
-            {APPOINTMENT_STATUSES.map((option) => (
-              <SelectItem key={option} value={option}>
-                {APPOINTMENT_STATUS_LABEL[option]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <span className="text-caption text-text-tertiary tabular ml-auto">
-          Jami {list.data?.count ?? 0} ta tashrif
-        </span>
-      </div>
+      </FilterBar>
 
       <ActiveFilters
         filters={[
-          ...(date
+          ...(range
             ? [
                 {
-                  id: "date",
-                  label: shortDate(date),
-                  onClear: () => reset(setDate)(null),
+                  id: "range",
+                  label: activeRangeLabel(range),
+                  emphasized: true,
+                  onClear: () => reset(setRange)(null),
                 },
               ]
             : []),
@@ -179,7 +212,42 @@ function AppointmentsBody() {
                 },
               ]
             : []),
+          ...(doctorId
+            ? [
+                {
+                  id: "doctor",
+                  label: "Shifokor tanlangan",
+                  onClear: () => reset(setDoctorId)(null),
+                },
+              ]
+            : []),
+          ...(purpose
+            ? [
+                {
+                  id: "purpose",
+                  label: PURPOSE_LABEL[purpose],
+                  onClear: () => reset(setPurpose)(null),
+                },
+              ]
+            : []),
+          ...(visitType
+            ? [
+                {
+                  id: "visitType",
+                  label: VISIT_TYPE_LABEL[visitType],
+                  onClear: () => reset(setVisitType)(null),
+                },
+              ]
+            : []),
         ]}
+        onClearAll={() => {
+          setRange(null);
+          setStatus(null);
+          setDoctorId(null);
+          setPurpose(null);
+          setVisitType(null);
+          setPage(1);
+        }}
       />
 
       <AppCard padded={false} className="overflow-hidden">

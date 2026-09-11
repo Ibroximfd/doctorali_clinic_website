@@ -39,7 +39,13 @@ export function ReceiptPrintButton({
           variant="ghost"
           size={size}
           disabled={busy}
-          onClick={() => print(orderId)}
+          onClick={(event) => {
+            // The button lives INSIDE a clickable row: without this, printing a
+            // receipt also opened the order's dialog on top of the list — a
+            // modal nobody asked for, over the list they were scanning.
+            event.stopPropagation();
+            print(orderId);
+          }}
           aria-label={label}
           className={cn(everPrinted ? "text-text-secondary" : "text-danger", className)}
         >

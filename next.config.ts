@@ -7,6 +7,32 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 /** `npm run analyze` opens the treemap; a normal build never loads it. */
 const withAnalyzer = withBundleAnalyzer({ enabled: process.env.ANALYZE === "true" });
 
+/**
+ * The hosts `next/image` may fetch from: the two known backends, plus whatever
+ * the media origin is set to for this deployment. Uploads are stored at their
+ * original size (multi-megabyte PNGs), so every thumbnail goes through the
+ * optimiser — an unlisted host would make it throw instead.
+ */
+function mediaRemotePatterns() {
+  const known = ["https://my.imorganic.uz", "https://test.imorganic.uz"];
+  const fromEnv = [process.env.NEXT_PUBLIC_MEDIA_ORIGIN, process.env.API_PROXY_TARGET];
+  const origins = new Set([...known, ...fromEnv.filter((v): v is string => Boolean(v))]);
+  return [...origins].flatMap((origin) => {
+    try {
+      const url = new URL(origin);
+      return [
+        {
+          protocol: url.protocol.replace(":", "") as "http" | "https",
+          hostname: url.hostname,
+          ...(url.port ? { port: url.port } : {}),
+        },
+      ];
+    } catch {
+      return [];
+    }
+  });
+}
+
 const nextConfig: NextConfig = {
   /**
    * Runs the app from a self-contained `.next/standalone` bundle, which is what
@@ -17,11 +43,14 @@ const nextConfig: NextConfig = {
 
   images: {
     // The backend serves product and avatar images from the API host.
-    remotePatterns: [
-      { protocol: "https", hostname: "my.imorganic.uz" },
-      { protocol: "https", hostname: "test.imorganic.uz" },
-    ],
-    formats: ["image/avif", "image/webp"],
+    remotePatterns: mediaRemotePatterns(),
+    // WebP ONLY. Every image here is a thumbnail, where AVIF saves nothing you
+    // can see but costs several times the encode time — and the encode happens
+    // on the first request, which is exactly the moment the desk is waiting.
+    formats: ["image/webp"],
+    // Uploads get a new filename when re-uploaded, so a resized copy never goes
+    // stale: keep it for a month rather than re-fetching a 3 MB original daily.
+    minimumCacheTTL: 30 * 86_400,
   },
 
   // The panel is behind a login and must never advertise its stack.

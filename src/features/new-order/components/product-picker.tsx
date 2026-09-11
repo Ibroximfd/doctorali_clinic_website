@@ -4,7 +4,7 @@ import { PackageSearch, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useProductsInfiniteQuery } from "@/features/products/hooks/use-products";
-import { saleStep, type Product } from "@/features/products/types/product";
+import type { Product } from "@/features/products/types/product";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { Button } from "@/shared/components/ui/button";
@@ -197,17 +197,8 @@ export function ProductPicker({
                   product={product}
                   quantityInCart={quantities[product.id] ?? 0}
                   highlighted={index === cursor}
-                  onAdd={(units) => onAdd(product, units)}
-                  onQuantityChange={(quantity) =>
-                    onQuantityChange(
-                      product,
-                      // A package-only product steps by the box, never by 1.
-                      Math.max(
-                        0,
-                        Math.round(quantity / saleStep(product)) * saleStep(product),
-                      ),
-                    )
-                  }
+                  onAdd={onAdd}
+                  onQuantityChange={onQuantityChange}
                 />
               ))}
             </div>

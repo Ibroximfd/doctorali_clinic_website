@@ -1,10 +1,12 @@
 "use client";
 
-import { Check, ChevronLeft, ChevronRight, Save, UserCheck, X } from "lucide-react";
+import { Check, Save, UserCheck, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { ListSkeleton } from "@/shared/components/data-display/list-skeleton";
+import { DateFilter } from "@/shared/components/data-display/date-filter";
 import { SearchField } from "@/shared/components/data-display/search-field";
+import { singleDayRange } from "@/shared/domain/date-presets";
 import { StatCard } from "@/shared/components/data-display/stat-card";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { ErrorState } from "@/shared/components/feedback/error-state";
@@ -13,7 +15,6 @@ import { AppAvatar } from "@/shared/components/ui/app-avatar";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import {
-  addDays,
   dayMonthYear,
   hhmm,
   isToday,
@@ -128,31 +129,17 @@ export function AttendanceSheetView() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="border-border bg-surface flex items-center gap-1 rounded-md border p-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setDate(addDays(shown, -1))}
-            aria-label="Oldingi kun"
-          >
-            <ChevronLeft className="size-4" />
-          </Button>
-          <span className="min-w-[190px] px-2 text-center">
-            <span className="text-title-sm block">{dayMonthYear(shown)}</span>
-            <span className="text-caption text-text-tertiary block">
-              {isToday(shown) ? "Bugun" : weekdayUz(shown)}
-            </span>
-          </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            disabled={isToday(shown)}
-            onClick={() => setDate(addDays(shown, 1))}
-            aria-label="Keyingi kun"
-          >
-            <ChevronRight className="size-4" />
-          </Button>
-        </div>
+        {/* The same date control as every other page, in its single-day mode:
+            ‹ › walk the sheet day by day, and the calendar jumps to a distant
+            one without twenty clicks. */}
+        <DateFilter
+          value={singleDayRange(shown)}
+          onChange={(next) => next && setDate(next.start)}
+          clearable={false}
+        />
+        <span className="text-caption text-text-tertiary">
+          {dayMonthYear(shown)} · {isToday(shown) ? "Bugun" : weekdayUz(shown)}
+        </span>
 
         {!isToday(shown) && (
           <Button variant="outline" onClick={() => setDate(null)}>

@@ -3,7 +3,11 @@
 import { Ban, ChevronRight, Wallet } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { DoctorFilter } from "@/features/doctors/components/doctor-filter";
 import { AppCard } from "@/shared/components/data-display/app-card";
+import { ActiveFilters } from "@/shared/components/data-display/active-filters";
+import { DateFilter } from "@/shared/components/data-display/date-filter";
+import { FilterBar, FilterSelect } from "@/shared/components/data-display/filter-bar";
 import { ListSkeleton } from "@/shared/components/data-display/list-skeleton";
 import { PageContainer } from "@/shared/components/data-display/page-container";
 import { PaginationBar } from "@/shared/components/data-display/pagination-bar";
@@ -14,7 +18,9 @@ import { ReasonDialog } from "@/shared/components/feedback/reason-dialog";
 import { AppAvatar } from "@/shared/components/ui/app-avatar";
 import { Button } from "@/shared/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
-import { dayMonth, dayMonthYear, ymd } from "@/shared/lib/format/date";
+import type { DateRange } from "@/shared/domain/date-range";
+import { activeRangeLabel } from "@/shared/domain/date-range-label";
+import { addDays, dayMonth, dayMonthYear, ymd } from "@/shared/lib/format/date";
 import { money } from "@/shared/lib/format/money";
 import { cn } from "@/shared/lib/utils";
 
@@ -24,7 +30,12 @@ import {
   useOutstandingQuery,
   usePayoutsQuery,
 } from "../hooks/use-payouts";
-import { PAYOUT_STATUS_LABEL, balanceOf, type Payout } from "../types/payout";
+import {
+  PAYOUT_STATUS_LABEL,
+  balanceOf,
+  type Payout,
+  type PayoutStatus,
+} from "../types/payout";
 import { WeekDetailDialog } from "./week-detail-dialog";
 
 const PAGE_SIZE = 20;
@@ -39,10 +50,73 @@ export function PayoutsView() {
   const [cancelling, setCancelling] = useState<Payout | null>(null);
   const [page, setPage] = useState(1);
 
-  const outstanding = useOutstandingQuery();
-  const filter = useMemo<PayoutFilter>(() => ({}), []);
+  /*
+   * History filters. The paid weeks pile up fast — a clinic with fifteen
+   * doctors writes sixty payouts a month — and the questions asked of this list
+   * are always "whose", "when" and "was it cancelled".
+   */
+  const [doctorId, setDoctorId] = useState<string | null>(null);
+  const [range, setRange] = useState<DateRange | null>(null);
+  const [status, setStatus] = useState<PayoutStatus | null>(null);
+
+  const outstanding = useOutstandingQuery(doctorId);
+  const filter = useMemo<PayoutFilter>(
+    () => ({
+      doctorId,
+      // `week_start` is a day on the wire, and our ranges end exclusive.
+      dateFrom: range?.start ?? null,
+      dateTo: range ? addDays(range.end, -1) : null,
+      status,
+    }),
+    [doctorId, range, status],
+  );
   const history = usePayoutsQuery(filter, page);
   const cancel = useCancelPayout();
+
+  function reset<T>(setter: (value: T) => void) {
+    return (value: T) => {
+      setter(value);
+      setPage(1);
+    };
+  }
+
+  function clearFilters() {
+    setDoctorId(null);
+    setRange(null);
+    setStatus(null);
+    setPage(1);
+  }
+
+  const historyChips = [
+    ...(range
+      ? [
+          {
+            id: "range",
+            label: activeRangeLabel(range),
+            emphasized: true,
+            onClear: () => reset(setRange)(null),
+          },
+        ]
+      : []),
+    ...(doctorId
+      ? [
+          {
+            id: "doctor",
+            label: "Shifokor tanlangan",
+            onClear: () => reset(setDoctorId)(null),
+          },
+        ]
+      : []),
+    ...(status
+      ? [
+          {
+            id: "status",
+            label: PAYOUT_STATUS_LABEL[status],
+            onClear: () => reset(setStatus)(null),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <PageContainer className="flex flex-col gap-4">
@@ -54,168 +128,213 @@ export function PayoutsView() {
       </Tabs>
 
       {tab === "outstanding" ? (
-        outstanding.error && !outstanding.data ? (
-          <AppCard padded={false}>
-            <ErrorState
-              error={outstanding.error}
-              onRetry={() => void outstanding.refetch()}
-            />
-          </AppCard>
-        ) : outstanding.isPending || !outstanding.data ? (
-          <AppCard padded={false}>
-            <ListSkeleton rows={4} height={120} />
-          </AppCard>
-        ) : outstanding.data.doctors.length === 0 ? (
-          <AppCard padded={false}>
-            <EmptyState
-              icon={Wallet}
-              title="Hammasi to'langan"
-              message="Barcha tugagan haftalar to'langan."
-            />
-          </AppCard>
-        ) : (
-          <>
-            <AppCard className="flex items-baseline gap-3">
-              <span className="text-label text-text-secondary flex-1">
-                Jami to&rsquo;lanmagan
-              </span>
-              <span className="text-display-sm tabular">
-                {money.plain(outstanding.data.grandTotal)}
-              </span>
+        <>
+          <FilterBar>
+            <DoctorFilter value={doctorId} onChange={setDoctorId} />
+          </FilterBar>
+          {outstanding.error && !outstanding.data ? (
+            <AppCard padded={false}>
+              <ErrorState
+                error={outstanding.error}
+                onRetry={() => void outstanding.refetch()}
+              />
             </AppCard>
-
-            <div className="flex flex-col gap-4">
-              {outstanding.data.doctors.map((entry) => (
-                <AppCard key={entry.doctor.id}>
-                  <SectionHeader
-                    title={entry.doctor.fullName}
-                    subtitle={`${entry.weeksCount} ta hafta · ${entry.doctor.specialty || "Mutaxassislik ko'rsatilmagan"}`}
-                    actions={
-                      <span className="text-title-lg tabular">
-                        {money.plain(entry.totalUnpaid)}
-                      </span>
-                    }
-                  />
-                  <ul className="mt-4 flex flex-col gap-2">
-                    {entry.weeks.map((w) => {
-                      const balance = balanceOf(w.totalAmount);
-                      return (
-                        <li key={w.weekStart.getTime()}>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setWeek({
-                                doctorId: String(entry.doctor.id),
-                                weekStart: ymd(w.weekStart),
-                              })
-                            }
-                            className={cn(
-                              "border-border flex w-full items-center gap-3 rounded-md border px-4 py-3 text-left",
-                              "hover:border-primary/40 hover:bg-surface-hover transition-colors",
-                              "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none",
-                            )}
-                          >
-                            <span className="min-w-0 flex-1">
-                              <span className="text-title-sm block">
-                                {dayMonth(w.weekStart)} – {dayMonthYear(w.weekEnd)}
-                              </span>
-                              <span className="text-caption text-text-tertiary block">
-                                {w.commissionCount} ta komissiya
-                              </span>
-                            </span>
-                            <span
-                              className={cn(
-                                "text-title tabular shrink-0",
-                                balance === "owed_by_doctor" && "text-danger",
-                              )}
-                            >
-                              {money.plain(w.totalAmount)}
-                            </span>
-                            <ChevronRight
-                              className="text-text-tertiary size-4 shrink-0"
-                              aria-hidden
-                            />
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </AppCard>
-              ))}
-            </div>
-          </>
-        )
-      ) : (
-        <AppCard padded={false} className="overflow-hidden">
-          {history.error && !history.data ? (
-            <ErrorState error={history.error} onRetry={() => void history.refetch()} />
-          ) : history.isPending || !history.data ? (
-            <ListSkeleton rows={8} height={66} />
-          ) : history.data.results.length === 0 ? (
-            <EmptyState
-              icon={Wallet}
-              title="To'lov yo'q"
-              message="Tanlangan filtr bo'yicha to'lov yo'q."
-            />
+          ) : outstanding.isPending || !outstanding.data ? (
+            <AppCard padded={false}>
+              <ListSkeleton rows={4} height={120} />
+            </AppCard>
+          ) : outstanding.data.doctors.length === 0 ? (
+            <AppCard padded={false}>
+              <EmptyState
+                icon={Wallet}
+                title="Hammasi to'langan"
+                message="Barcha tugagan haftalar to'langan."
+              />
+            </AppCard>
           ) : (
             <>
-              <ul>
-                {history.data.results.map((payout, index) => (
-                  <li
-                    key={payout.id}
-                    className={index > 0 ? "border-surface-alt border-t" : undefined}
-                  >
-                    <div className="flex items-center gap-3 px-5 py-3.5">
-                      <AppAvatar
-                        name={payout.doctor.fullName}
-                        imageUrl={payout.doctor.avatarUrl}
-                        size={38}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-title-sm truncate">{payout.doctor.fullName}</p>
-                        <p className="text-caption text-text-tertiary truncate">
-                          {dayMonth(payout.weekStart)} – {dayMonthYear(payout.weekEnd)}
-                          {payout.paidByName && ` · ${payout.paidByName}`}
-                        </p>
-                      </div>
-                      <span
-                        className={cn(
-                          "text-label-xs shrink-0 rounded-full px-2 py-0.5",
-                          payout.status === "paid"
-                            ? "bg-primary-soft text-primary-dark"
-                            : "bg-danger/12 text-danger",
-                        )}
-                      >
-                        {PAYOUT_STATUS_LABEL[payout.status]}
-                      </span>
-                      <span className="text-title tabular w-32 shrink-0 text-right">
-                        {money.plain(payout.totalAmount)}
-                      </span>
-                      {payout.status === "paid" && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setCancelling(payout)}
-                          aria-label="To'lovni bekor qilish"
-                          className="text-text-secondary hover:text-danger shrink-0"
-                        >
-                          <Ban className="size-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </li>
+              <AppCard className="flex items-baseline gap-3">
+                <span className="text-label text-text-secondary flex-1">
+                  Jami to&rsquo;lanmagan
+                </span>
+                <span className="text-display-sm tabular">
+                  {money.plain(outstanding.data.grandTotal)}
+                </span>
+              </AppCard>
+
+              <div className="flex flex-col gap-4">
+                {outstanding.data.doctors.map((entry) => (
+                  <AppCard key={entry.doctor.id}>
+                    <SectionHeader
+                      title={entry.doctor.fullName}
+                      subtitle={`${entry.weeksCount} ta hafta · ${entry.doctor.specialty || "Mutaxassislik ko'rsatilmagan"}`}
+                      actions={
+                        <span className="text-title-lg tabular">
+                          {money.plain(entry.totalUnpaid)}
+                        </span>
+                      }
+                    />
+                    <ul className="mt-4 flex flex-col gap-2">
+                      {entry.weeks.map((w) => {
+                        const balance = balanceOf(w.totalAmount);
+                        return (
+                          <li key={w.weekStart.getTime()}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setWeek({
+                                  doctorId: String(entry.doctor.id),
+                                  weekStart: ymd(w.weekStart),
+                                })
+                              }
+                              className={cn(
+                                "border-border flex w-full items-center gap-3 rounded-md border px-4 py-3 text-left",
+                                "hover:border-primary/40 hover:bg-surface-hover transition-colors",
+                                "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none",
+                              )}
+                            >
+                              <span className="min-w-0 flex-1">
+                                <span className="text-title-sm block">
+                                  {dayMonth(w.weekStart)} – {dayMonthYear(w.weekEnd)}
+                                </span>
+                                <span className="text-caption text-text-tertiary block">
+                                  {w.commissionCount} ta komissiya
+                                </span>
+                              </span>
+                              <span
+                                className={cn(
+                                  "text-title tabular shrink-0",
+                                  balance === "owed_by_doctor" && "text-danger",
+                                )}
+                              >
+                                {money.plain(w.totalAmount)}
+                              </span>
+                              <ChevronRight
+                                className="text-text-tertiary size-4 shrink-0"
+                                aria-hidden
+                              />
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </AppCard>
                 ))}
-              </ul>
-              <PaginationBar
-                page={page}
-                pageSize={PAGE_SIZE}
-                total={history.data.count}
-                onPageChange={setPage}
-                busy={history.isFetching}
-              />
+              </div>
             </>
           )}
-        </AppCard>
+        </>
+      ) : (
+        <>
+          <FilterBar>
+            <DateFilter value={range} onChange={reset(setRange)} />
+            <DoctorFilter value={doctorId} onChange={reset(setDoctorId)} />
+            <FilterSelect
+              label="Holat"
+              value={status}
+              onChange={reset(setStatus)}
+              options={[
+                { value: "paid" as const, label: PAYOUT_STATUS_LABEL.paid },
+                { value: "cancelled" as const, label: PAYOUT_STATUS_LABEL.cancelled },
+              ]}
+              allLabel="Barcha holatlar"
+              width="w-[170px]"
+            />
+          </FilterBar>
+
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <ActiveFilters
+              filters={historyChips}
+              onClearAll={clearFilters}
+              className="min-w-0 flex-1"
+            />
+            {history.data && (
+              <span className="text-caption text-text-tertiary tabular shrink-0">
+                {history.data.count} ta to&rsquo;lov
+              </span>
+            )}
+          </div>
+
+          <AppCard padded={false} className="overflow-hidden">
+            {history.error && !history.data ? (
+              <ErrorState error={history.error} onRetry={() => void history.refetch()} />
+            ) : history.isPending || !history.data ? (
+              <ListSkeleton rows={8} height={66} />
+            ) : history.data.results.length === 0 ? (
+              <EmptyState
+                icon={Wallet}
+                title="To'lov yo'q"
+                message="Tanlangan filtr bo'yicha to'lov yo'q."
+                action={
+                  historyChips.length > 0 ? (
+                    <Button variant="outline" onClick={clearFilters}>
+                      Filtrlarni tozalash
+                    </Button>
+                  ) : undefined
+                }
+              />
+            ) : (
+              <>
+                <ul>
+                  {history.data.results.map((payout, index) => (
+                    <li
+                      key={payout.id}
+                      className={index > 0 ? "border-surface-alt border-t" : undefined}
+                    >
+                      <div className="flex items-center gap-3 px-5 py-3.5">
+                        <AppAvatar
+                          name={payout.doctor.fullName}
+                          imageUrl={payout.doctor.avatarUrl}
+                          size={38}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-title-sm truncate">
+                            {payout.doctor.fullName}
+                          </p>
+                          <p className="text-caption text-text-tertiary truncate">
+                            {dayMonth(payout.weekStart)} – {dayMonthYear(payout.weekEnd)}
+                            {payout.paidByName && ` · ${payout.paidByName}`}
+                          </p>
+                        </div>
+                        <span
+                          className={cn(
+                            "text-label-xs shrink-0 rounded-full px-2 py-0.5",
+                            payout.status === "paid"
+                              ? "bg-primary-soft text-primary-dark"
+                              : "bg-danger/12 text-danger",
+                          )}
+                        >
+                          {PAYOUT_STATUS_LABEL[payout.status]}
+                        </span>
+                        <span className="text-title tabular w-32 shrink-0 text-right">
+                          {money.plain(payout.totalAmount)}
+                        </span>
+                        {payout.status === "paid" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setCancelling(payout)}
+                            aria-label="To'lovni bekor qilish"
+                            className="text-text-secondary hover:text-danger shrink-0"
+                          >
+                            <Ban className="size-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <PaginationBar
+                  page={page}
+                  pageSize={PAGE_SIZE}
+                  total={history.data.count}
+                  onPageChange={setPage}
+                  busy={history.isFetching}
+                />
+              </>
+            )}
+          </AppCard>
+        </>
       )}
 
       <WeekDetailDialog

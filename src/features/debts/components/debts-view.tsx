@@ -13,7 +13,15 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { clientDetailPath } from "@/config/routes";
+import { DoctorFilter } from "@/features/doctors/components/doctor-filter";
 import { AppCard } from "@/shared/components/data-display/app-card";
+import { ActiveFilters } from "@/shared/components/data-display/active-filters";
+import { DateFilter } from "@/shared/components/data-display/date-filter";
+import {
+  FilterBar,
+  FilterSelect,
+  SortSelect,
+} from "@/shared/components/data-display/filter-bar";
 import { ListSkeleton } from "@/shared/components/data-display/list-skeleton";
 import { PageContainer } from "@/shared/components/data-display/page-container";
 import { PaginationBar } from "@/shared/components/data-display/pagination-bar";
@@ -22,8 +30,10 @@ import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { AppAvatar } from "@/shared/components/ui/app-avatar";
 import { Button } from "@/shared/components/ui/button";
+import type { DateRange } from "@/shared/domain/date-range";
+import { activeRangeLabel } from "@/shared/domain/date-range-label";
 import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
-import { dayMonthYear } from "@/shared/lib/format/date";
+import { addDays, dayMonthYear } from "@/shared/lib/format/date";
 import { money } from "@/shared/lib/format/money";
 import { phoneFromApi } from "@/shared/lib/format/phone";
 import { cn } from "@/shared/lib/utils";
@@ -35,12 +45,29 @@ import {
   type DebtView,
 } from "../api/debts-api";
 import { useDebtSummaryQuery, useDebtsExport, useDebtsQuery } from "../hooks/use-debts";
-import { debtSourceLabel, debtSourceRef, isDebtPayable, type Debt } from "../types/debt";
+import {
+  DEBT_SOURCE_LABEL,
+  debtSourceLabel,
+  debtSourceRef,
+  isDebtPayable,
+  type Debt,
+  type DebtSource,
+} from "../types/debt";
 import { DebtExtendDialog } from "./debt-extend-dialog";
 import { DebtPayDialog } from "./debt-pay-dialog";
 import { DebtStatusBadge, DueDateBadge } from "./debt-status-badge";
 
 const PAGE_SIZE = 20;
+
+/** How the list is ordered — the deadline first is how the desk works it. */
+const ORDERINGS = [
+  { value: "due_date", label: "Muddati yaqin" },
+  { value: "-due_date", label: "Muddati uzoq" },
+  { value: "-remaining_amount", label: "Katta qoldiq" },
+  { value: "remaining_amount", label: "Kichik qoldiq" },
+  { value: "-created_at", label: "Yangi qarzlar" },
+] as const;
+type DebtOrdering = (typeof ORDERINGS)[number]["value"];
 
 /** "Qarzlar" — who owes what, and which deadline is next. */
 export function DebtsView() {
@@ -50,10 +77,28 @@ export function DebtsView() {
   const [paying, setPaying] = useState<Debt | null>(null);
   const [extending, setExtending] = useState<Debt | null>(null);
 
+  /*
+   * The deadline window, the doctor behind the sale and where the debt came
+   * from. `dueRange` narrows INSIDE the chosen view — "kechikkan qarzlar, shu
+   * hafta muddati bo'lganlar" is one question, not two.
+   */
+  const [dueRange, setDueRange] = useState<DateRange | null>(null);
+  const [doctorId, setDoctorId] = useState<string | null>(null);
+  const [source, setSource] = useState<DebtSource | null>(null);
+  const [ordering, setOrdering] = useState<DebtOrdering>("due_date");
+
   const debouncedSearch = useDebouncedValue(search);
   const filter = useMemo<DebtFilter>(
-    () => ({ view, search: debouncedSearch, ordering: "due_date" }),
-    [view, debouncedSearch],
+    () => ({
+      view,
+      search: debouncedSearch,
+      doctorId,
+      source,
+      dueFrom: dueRange?.start ?? null,
+      dueTo: dueRange ? addDays(dueRange.end, -1) : null,
+      ordering,
+    }),
+    [view, debouncedSearch, doctorId, source, dueRange, ordering],
   );
 
   const list = useDebtsQuery(filter, page);
@@ -107,7 +152,52 @@ export function DebtsView() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
+      <FilterBar
+        extraCount={[doctorId, source, dueRange].filter((v) => v !== null).length}
+        extra={
+          <>
+            <DateFilter
+              value={dueRange}
+              onChange={(next) => {
+                setDueRange(next);
+                setPage(1);
+              }}
+            />
+            <DoctorFilter
+              value={doctorId}
+              onChange={(next) => {
+                setDoctorId(next);
+                setPage(1);
+              }}
+            />
+            <FilterSelect
+              label="Manba"
+              value={source}
+              onChange={(next) => {
+                setSource(next);
+                setPage(1);
+              }}
+              options={[
+                { value: "order" as const, label: DEBT_SOURCE_LABEL.order },
+                { value: "treatment" as const, label: DEBT_SOURCE_LABEL.treatment },
+              ]}
+              allLabel="Barcha manbalar"
+              width="w-[170px]"
+            />
+            <SortSelect value={ordering} onChange={setOrdering} options={ORDERINGS} />
+          </>
+        }
+        action={
+          <Button
+            variant="outline"
+            onClick={() => exportMutation.mutate(filter)}
+            disabled={exportMutation.isPending}
+          >
+            <Download className="size-4" aria-hidden />
+            Excel
+          </Button>
+        }
+      >
         <SearchField
           value={search}
           onChange={(value) => {
@@ -115,7 +205,7 @@ export function DebtsView() {
             setPage(1);
           }}
           placeholder="Ism, telefon yoki buyurtma raqami…"
-          className="w-full sm:w-[320px]"
+          className="w-full sm:w-[280px]"
         />
         <div
           role="tablist"
@@ -141,15 +231,62 @@ export function DebtsView() {
             </button>
           ))}
         </div>
-        <div className="flex-1" />
-        <Button
-          variant="outline"
-          onClick={() => exportMutation.mutate(filter)}
-          disabled={exportMutation.isPending}
-        >
-          <Download className="size-4" aria-hidden />
-          Excel
-        </Button>
+      </FilterBar>
+
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <ActiveFilters
+          className="min-w-0 flex-1"
+          filters={[
+            ...(dueRange
+              ? [
+                  {
+                    id: "due",
+                    label: `Muddat: ${activeRangeLabel(dueRange)}`,
+                    emphasized: true,
+                    onClear: () => {
+                      setDueRange(null);
+                      setPage(1);
+                    },
+                  },
+                ]
+              : []),
+            ...(doctorId
+              ? [
+                  {
+                    id: "doctor",
+                    label: "Shifokor tanlangan",
+                    onClear: () => {
+                      setDoctorId(null);
+                      setPage(1);
+                    },
+                  },
+                ]
+              : []),
+            ...(source
+              ? [
+                  {
+                    id: "source",
+                    label: DEBT_SOURCE_LABEL[source],
+                    onClear: () => {
+                      setSource(null);
+                      setPage(1);
+                    },
+                  },
+                ]
+              : []),
+          ]}
+          onClearAll={() => {
+            setDueRange(null);
+            setDoctorId(null);
+            setSource(null);
+            setPage(1);
+          }}
+        />
+        {list.data && (
+          <span className="text-caption text-text-tertiary tabular shrink-0">
+            {list.data.count} ta qarz
+          </span>
+        )}
       </div>
 
       <AppCard padded={false} className="overflow-hidden">

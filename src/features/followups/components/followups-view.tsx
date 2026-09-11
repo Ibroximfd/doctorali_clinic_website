@@ -10,17 +10,16 @@ import { ListSkeleton } from "@/shared/components/data-display/list-skeleton";
 import { PageContainer } from "@/shared/components/data-display/page-container";
 import { PaginationBar } from "@/shared/components/data-display/pagination-bar";
 import { SearchField } from "@/shared/components/data-display/search-field";
+import {
+  FilterBar,
+  FilterSelect,
+  SortSelect,
+} from "@/shared/components/data-display/filter-bar";
+import { DoctorFilter } from "@/features/doctors/components/doctor-filter";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { AppAvatar } from "@/shared/components/ui/app-avatar";
 import { Button } from "@/shared/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select";
 import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
 import { dayMonthYear, relativeDay } from "@/shared/lib/format/date";
 import { money } from "@/shared/lib/format/money";
@@ -45,7 +44,6 @@ import { FollowupContactDialog } from "./followup-contact-dialog";
 import { FollowupHistoryDialog } from "./followup-history-dialog";
 
 const PAGE_SIZE = 20;
-const ALL = "__all__";
 
 /**
  * "Eslatmalar" — clients who bought a while ago and are due a call.
@@ -58,6 +56,7 @@ export function FollowupsView() {
   const [period, setPeriod] = useState<FollowupPeriod>(DEFAULT_FOLLOWUP_PERIOD);
   const [status, setStatus] = useState<FollowupStatus | null>(null);
   const [ordering, setOrdering] = useState<string>(DEFAULT_FOLLOWUP_ORDERING);
+  const [doctorId, setDoctorId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [contacting, setContacting] = useState<FollowupEntry | null>(null);
@@ -66,8 +65,8 @@ export function FollowupsView() {
   const debouncedSearch = useDebouncedValue(search);
 
   const filter = useMemo<FollowupFilter>(
-    () => ({ period, status, ordering, search: debouncedSearch }),
-    [period, status, ordering, debouncedSearch],
+    () => ({ period, status, ordering, doctorId, search: debouncedSearch }),
+    [period, status, ordering, doctorId, debouncedSearch],
   );
 
   const list = useFollowupsQuery(filter, page);
@@ -81,12 +80,38 @@ export function FollowupsView() {
 
   return (
     <PageContainer className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
+      <FilterBar
+        extraCount={[doctorId, status].filter((v) => v !== null).length}
+        extra={
+          <>
+            <DoctorFilter value={doctorId} onChange={reset(setDoctorId)} />
+            <FilterSelect
+              label="Holat"
+              value={status}
+              onChange={reset(setStatus)}
+              options={FOLLOWUP_STATUSES.map((value) => ({
+                value,
+                label: FOLLOWUP_STATUS_LABEL[value],
+              }))}
+              allLabel="Barcha holatlar"
+              width="w-[180px]"
+            />
+          </>
+        }
+        action={
+          <SortSelect
+            value={ordering}
+            onChange={reset(setOrdering)}
+            options={FOLLOWUP_ORDERINGS}
+            width="w-[200px]"
+          />
+        }
+      >
         <SearchField
           value={search}
           onChange={reset(setSearch)}
           placeholder="Ism yoki telefon…"
-          className="w-full sm:w-[280px]"
+          className="w-full sm:w-[260px]"
         />
 
         <div
@@ -113,41 +138,7 @@ export function FollowupsView() {
             </button>
           ))}
         </div>
-
-        <Select
-          value={status ?? ALL}
-          onValueChange={reset((value: string) =>
-            setStatus(value === ALL ? null : (value as FollowupStatus)),
-          )}
-        >
-          <SelectTrigger className="w-[180px]" aria-label="Holat">
-            <SelectValue placeholder="Barcha holatlar" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Barcha holatlar</SelectItem>
-            {FOLLOWUP_STATUSES.map((s) => (
-              <SelectItem key={s} value={s}>
-                {FOLLOWUP_STATUS_LABEL[s]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <div className="flex-1" />
-
-        <Select value={ordering} onValueChange={reset(setOrdering)}>
-          <SelectTrigger className="w-[200px]" aria-label="Saralash">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {FOLLOWUP_ORDERINGS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      </FilterBar>
 
       <AppCard padded={false} className="overflow-hidden">
         {list.error && !list.data ? (

@@ -1,4 +1,4 @@
-import { resolveMediaUrl } from "@/shared/lib/media";
+import { MediaImage } from "@/shared/components/ui/media-image";
 import { cn } from "@/shared/lib/utils";
 
 /** Up to two letters from a full name, for the avatar fallback. */
@@ -13,9 +13,9 @@ export function initialsOf(name: string): string {
  * The tinted initials chip used for every person in the panel, with the photo
  * on top when there is one.
  *
- * Deliberately a plain `<img>` rather than `next/image`: these are small,
- * arbitrary-origin avatars scattered through long lists, and routing every one
- * through the optimiser buys nothing while adding a request per row.
+ * The photo goes through {@link MediaImage}: the originals are ~900 KB each,
+ * and a list of twenty rows was downloading and decoding 16 MB of faces to draw
+ * twenty 30px circles.
  */
 export function AppAvatar({
   name,
@@ -28,7 +28,6 @@ export function AppAvatar({
   size?: number;
   className?: string;
 }) {
-  const src = resolveMediaUrl(imageUrl);
   return (
     <span
       className={cn(
@@ -39,9 +38,13 @@ export function AppAvatar({
       style={{ width: size, height: size, fontSize: Math.max(10, size * 0.36) }}
       aria-hidden
     >
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element -- see doc comment
-        <img src={src} alt="" loading="lazy" className="size-full object-cover" />
+      {imageUrl ? (
+        <MediaImage
+          src={imageUrl}
+          alt=""
+          size={size}
+          className="size-full object-cover"
+        />
       ) : (
         initialsOf(name)
       )}

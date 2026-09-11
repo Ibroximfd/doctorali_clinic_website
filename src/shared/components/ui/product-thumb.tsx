@@ -1,6 +1,6 @@
 import { ImageOff } from "lucide-react";
 
-import { resolveMediaUrl } from "@/shared/lib/media";
+import { MediaImage } from "@/shared/components/ui/media-image";
 import { cn } from "@/shared/lib/utils";
 
 /**
@@ -22,8 +22,6 @@ export function ProductThumb({
   size?: number;
   className?: string;
 }) {
-  const src = resolveMediaUrl(imageUrl);
-
   return (
     <span
       className={cn(
@@ -32,9 +30,13 @@ export function ProductThumb({
       )}
       style={{ width: size, height: size }}
     >
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element -- arbitrary-origin thumbnail
-        <img src={src} alt={name} loading="lazy" className="size-full object-cover" />
+      {imageUrl ? (
+        <MediaImage
+          src={imageUrl}
+          alt={name}
+          size={size}
+          className="size-full object-cover"
+        />
       ) : (
         <ImageOff
           className="text-text-tertiary"

@@ -22,3 +22,11 @@ services:
       API_PROXY_TARGET: ${API_PROXY_TARGET:-https://my.imorganic.uz}
     ports:
       - "127.0.0.1:3000:3000"
+    volumes:
+      # Resized product photos and avatars. Without this the cache lives inside
+      # the container and a redeploy throws it away, so the first hour after
+      # every release is spent re-shrinking multi-megabyte originals.
+      - image-cache:/app/.next/cache/images
+
+volumes:
+  image-cache:

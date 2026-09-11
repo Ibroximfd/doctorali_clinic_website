@@ -153,9 +153,11 @@ async function request<T>(
   } catch (error) {
     // No HTTP response at all — offline, DNS, timeout, or a blocked CORS
     // preflight (which the browser reports as a plain network failure).
+    // A cancelled request (the desk changed the filter before the answer came)
+    // is routine, not a failure — it must not paint a red CORS warning.
+    if (error instanceof DOMException && error.name === "AbortError") throw error;
     logError(method, path, error);
     warnAboutCorsOnce(path);
-    if (error instanceof DOMException && error.name === "AbortError") throw error;
     throw networkError();
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { Gift, Minus, Plus, Trash2 } from "lucide-react";
+import { memo } from "react";
 
 import type { CartItem } from "@/features/orders/types/cart";
 import {
@@ -29,8 +30,11 @@ import { LinePriceEditor } from "./line-price-editor";
  * dialog: the quantity (stepper), the price (the total is a button), and how
  * many units go out free (the gift stepper). The gift control only appears once
  * there is more than nothing to give away, so an ordinary line stays quiet.
+ *
+ * Memoised; the callbacks are the store's own actions and take the product id,
+ * so a change to one line re-renders one row rather than the whole basket.
  */
-export function CartLineRow({
+export const CartLineRow = memo(function CartLineRow({
   item,
   serverLineTotal,
   onQuantityChange,
@@ -40,11 +44,15 @@ export function CartLineRow({
 }: {
   item: CartItem;
   serverLineTotal: number | null;
-  onQuantityChange: (quantity: number) => void;
-  onPriceChange: (input: { unitPrice: number | null; lineTotal: number | null }) => void;
-  onGiftChange: (giftQuantity: number) => void;
-  onRemove: () => void;
+  onQuantityChange: (productId: string, quantity: number) => void;
+  onPriceChange: (
+    productId: string,
+    input: { unitPrice: number | null; lineTotal?: number | null },
+  ) => void;
+  onGiftChange: (productId: string, giftQuantity: number) => void;
+  onRemove: (productId: string) => void;
 }) {
+  const productId = item.product.id;
   const step = saleStep(item.product);
   const limit = maxSellableQuantity(item.product);
   const atLimit = limit !== null && item.quantity >= limit;
@@ -105,7 +113,7 @@ export function CartLineRow({
           type="button"
           variant="ghost"
           size="icon"
-          onClick={onRemove}
+          onClick={() => onRemove(productId)}
           aria-label={`${item.product.name} savatdan olib tashlash`}
           className="text-text-tertiary hover:text-danger shrink-0"
         >
@@ -126,7 +134,7 @@ export function CartLineRow({
         <div className="flex shrink-0 items-center gap-1">
           <StepButton
             label="Kamaytirish"
-            onClick={() => onQuantityChange(item.quantity - step)}
+            onClick={() => onQuantityChange(productId, item.quantity - step)}
           >
             <Minus className="size-4" />
           </StepButton>
@@ -134,23 +142,23 @@ export function CartLineRow({
           <StepButton
             label="Ko'paytirish"
             disabled={atLimit}
-            onClick={() => onQuantityChange(item.quantity + step)}
+            onClick={() => onQuantityChange(productId, item.quantity + step)}
           >
             <Plus className="size-4" />
           </StepButton>
         </div>
 
-        <GiftStepper item={item} onChange={onGiftChange} />
+        <GiftStepper item={item} onChange={(gift) => onGiftChange(productId, gift)} />
 
         <LinePriceEditor
           item={item}
           serverLineTotal={serverLineTotal}
-          onApply={onPriceChange}
+          onApply={(input) => onPriceChange(productId, input)}
         />
       </>
     );
   }
-}
+});
 
 /**
  * How many units of this line go out free.

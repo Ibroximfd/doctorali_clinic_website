@@ -9,7 +9,9 @@ import { PinConfirmDialog } from "@/features/security/components/pin-confirm-dia
 import { usePinGate } from "@/features/security/hooks/use-pin-gate";
 import { AppCard } from "@/shared/components/data-display/app-card";
 import { ActiveFilters } from "@/shared/components/data-display/active-filters";
-import { DateRangePicker } from "@/shared/components/data-display/date-range-picker";
+import { DoctorFilter } from "@/features/doctors/components/doctor-filter";
+import { DateFilter } from "@/shared/components/data-display/date-filter";
+import { FilterBar, FilterSelect } from "@/shared/components/data-display/filter-bar";
 import { ListSkeleton } from "@/shared/components/data-display/list-skeleton";
 import { PageContainer } from "@/shared/components/data-display/page-container";
 import { PaginationBar } from "@/shared/components/data-display/pagination-bar";
@@ -26,19 +28,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select";
 import { resolveRange, type DateRange } from "@/shared/domain/date-range";
 import { activeRangeLabel } from "@/shared/domain/date-range-label";
 import {
   MIXED_PAYMENT_LABEL,
   NO_PAYMENT_LABEL,
+  PAYMENT_TYPES,
   PAYMENT_TYPE_LABEL,
+  type PaymentType,
 } from "@/shared/domain/payment-type";
 import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
 import { dayMonthTime, isToday } from "@/shared/lib/format/date";
@@ -54,16 +51,17 @@ import {
 } from "../hooks/use-treatments";
 import {
   TREATMENT_KIND_LABEL,
+  TREATMENT_STATUS_LABEL,
   averageTreatmentAmount,
   treatmentClientName,
   treatmentKindLabel,
   type Treatment,
   type TreatmentKind,
+  type TreatmentStatus,
 } from "../types/treatment";
 import { TreatmentFormDialog } from "./treatment-form-dialog";
 
 const PAGE_SIZE = 20;
-const ALL = "__all__";
 
 /** "Muolajalar" — the services performed, and what each earned the doctor. */
 export function TreatmentsView() {
@@ -72,6 +70,10 @@ export function TreatmentsView() {
   // Opens on today, like the orders list: the day's services are what the desk
   // checks, and the whole history is one ✕ away on the filter chip.
   const [range, setRange] = useState<DateRange | null>(() => resolveRange("daily"));
+  const [doctorId, setDoctorId] = useState<string | null>(null);
+  const [paymentType, setPaymentType] = useState<PaymentType | null>(null);
+  const [status, setStatus] = useState<TreatmentStatus | null>(null);
+  const [hasDebt, setHasDebt] = useState<"yes" | "no" | null>(null);
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [cancelling, setCancelling] = useState<Treatment | null>(null);
@@ -81,8 +83,17 @@ export function TreatmentsView() {
   const cancel = useCancelTreatment();
 
   const filter = useMemo<TreatmentFilter>(
-    () => ({ search: debouncedSearch, kind, range, ordering: "-performed_at" }),
-    [debouncedSearch, kind, range],
+    () => ({
+      search: debouncedSearch,
+      kind,
+      range,
+      doctorId,
+      paymentType,
+      status,
+      hasDebt: hasDebt === null ? null : hasDebt === "yes",
+      ordering: "-performed_at",
+    }),
+    [debouncedSearch, kind, range, doctorId, paymentType, status, hasDebt],
   );
 
   const list = useTreatmentsQuery(filter, page);
@@ -142,37 +153,73 @@ export function TreatmentsView() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
+      <FilterBar
+        extraCount={
+          [doctorId, paymentType, status, hasDebt].filter((v) => v !== null).length
+        }
+        extra={
+          <>
+            <DoctorFilter value={doctorId} onChange={reset(setDoctorId)} />
+            <FilterSelect
+              label="To'lov turi"
+              value={paymentType}
+              onChange={reset(setPaymentType)}
+              options={PAYMENT_TYPES.map((type) => ({
+                value: type,
+                label: PAYMENT_TYPE_LABEL[type],
+              }))}
+              allLabel="Barcha to'lovlar"
+            />
+            <FilterSelect
+              label="Qarz"
+              value={hasDebt}
+              onChange={reset(setHasDebt)}
+              options={[
+                { value: "yes" as const, label: "Qarzli" },
+                { value: "no" as const, label: "Qarzsiz" },
+              ]}
+              allLabel="Qarzi bor-yo'q"
+              width="w-[150px]"
+            />
+            <FilterSelect
+              label="Holat"
+              value={status}
+              onChange={reset(setStatus)}
+              options={[
+                { value: "completed" as const, label: TREATMENT_STATUS_LABEL.completed },
+                { value: "cancelled" as const, label: TREATMENT_STATUS_LABEL.cancelled },
+              ]}
+              allLabel="Barcha holatlar"
+              width="w-[170px]"
+            />
+          </>
+        }
+        action={
+          <Button onClick={() => setFormOpen(true)}>
+            <Plus className="size-4" aria-hidden />
+            Yangi muolaja
+          </Button>
+        }
+      >
         <SearchField
           value={search}
           onChange={reset(setSearch)}
           placeholder="Mijoz, telefon yoki tavsif…"
-          className="w-full sm:w-[300px]"
+          className="w-full sm:w-[260px]"
         />
-        <Select
-          value={kind ?? ALL}
-          onValueChange={reset((value: string) =>
-            setKind(value === ALL ? null : (value as TreatmentKind)),
-          )}
-        >
-          <SelectTrigger className="w-[190px]" aria-label="Xizmat turi">
-            <SelectValue placeholder="Barcha turlar" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Barcha turlar</SelectItem>
-            <SelectItem value="treatment">{TREATMENT_KIND_LABEL.treatment}</SelectItem>
-            <SelectItem value="consultation">
-              {TREATMENT_KIND_LABEL.consultation}
-            </SelectItem>
-          </SelectContent>
-        </Select>
-        <DateRangePicker value={range} onChange={reset(setRange)} />
-        <div className="flex-1" />
-        <Button onClick={() => setFormOpen(true)}>
-          <Plus className="size-4" aria-hidden />
-          Yangi muolaja
-        </Button>
-      </div>
+        <DateFilter value={range} onChange={reset(setRange)} />
+        <FilterSelect
+          label="Xizmat turi"
+          value={kind}
+          onChange={reset(setKind)}
+          options={[
+            { value: "treatment" as const, label: TREATMENT_KIND_LABEL.treatment },
+            { value: "consultation" as const, label: TREATMENT_KIND_LABEL.consultation },
+          ]}
+          allLabel="Barcha turlar"
+          width="w-[180px]"
+        />
+      </FilterBar>
 
       {/* The day the list is showing, with the ✕ that opens the whole history
           — the filter is on by default now, so it must be visibly removable. */}
@@ -197,7 +244,52 @@ export function TreatmentsView() {
                 },
               ]
             : []),
+          ...(doctorId
+            ? [
+                {
+                  id: "doctor",
+                  label: "Shifokor tanlangan",
+                  onClear: () => reset(setDoctorId)(null),
+                },
+              ]
+            : []),
+          ...(paymentType
+            ? [
+                {
+                  id: "payment",
+                  label: PAYMENT_TYPE_LABEL[paymentType],
+                  onClear: () => reset(setPaymentType)(null),
+                },
+              ]
+            : []),
+          ...(hasDebt
+            ? [
+                {
+                  id: "debt",
+                  label: hasDebt === "yes" ? "Qarzli" : "Qarzsiz",
+                  onClear: () => reset(setHasDebt)(null),
+                },
+              ]
+            : []),
+          ...(status
+            ? [
+                {
+                  id: "status",
+                  label: TREATMENT_STATUS_LABEL[status],
+                  onClear: () => reset(setStatus)(null),
+                },
+              ]
+            : []),
         ]}
+        onClearAll={() => {
+          setKind(null);
+          setRange(null);
+          setDoctorId(null);
+          setPaymentType(null);
+          setStatus(null);
+          setHasDebt(null);
+          setPage(1);
+        }}
       />
 
       <AppCard padded={false} className="overflow-hidden">

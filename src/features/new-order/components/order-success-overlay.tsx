@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import type { CreateOrderResult } from "@/features/orders/types/order";
 import { Button } from "@/shared/components/ui/button";
 import { money } from "@/shared/lib/format/money";
-import { resolveMediaUrl } from "@/shared/lib/media";
+import { MediaImage } from "@/shared/components/ui/media-image";
 
 /**
  * The confirmation after a sale is booked.
@@ -36,7 +36,6 @@ export function OrderSuccessOverlay({
   }, []);
 
   const gift = result.gift;
-  const giftImage = resolveMediaUrl(gift?.imageUrl ?? null);
 
   return (
     <div
@@ -60,11 +59,12 @@ export function OrderSuccessOverlay({
 
       {gift && (
         <div className="border-gold/40 bg-gold/10 flex w-full items-center gap-3 rounded-md border p-3 text-left">
-          {giftImage ? (
-            // eslint-disable-next-line @next/next/no-img-element -- arbitrary-origin thumbnail
-            <img
-              src={giftImage}
+          {gift.imageUrl ? (
+            <MediaImage
+              src={gift.imageUrl}
               alt=""
+              size={48}
+              priority
               className="size-12 shrink-0 rounded-sm object-cover"
             />
           ) : (

@@ -28,7 +28,7 @@ import {
   PAYMENT_TYPE_ICON,
   PAYMENT_TYPE_LABEL,
 } from "@/shared/domain/payment-type";
-import { dayMonthTime, isToday } from "@/shared/lib/format/date";
+import { dayMonthYearTime, isToday } from "@/shared/lib/format/date";
 import { money } from "@/shared/lib/format/money";
 import { percent } from "@/shared/lib/format/percent";
 import { phoneFromApi } from "@/shared/lib/format/phone";
@@ -41,6 +41,7 @@ import {
   lineQuantityLabel,
   lineShowsPackaging,
   orderDisplayClientName,
+  orderUnitCount,
   totalOverrideDelta,
   type OrderDetail,
   type OrderLine,
@@ -72,14 +73,28 @@ export function OrderDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-[900px]">
+      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-[980px]">
         <DialogHeader>
-          <DialogTitle className="tabular">
-            {order ? order.orderNumber : "Buyurtma"}
-          </DialogTitle>
-          <DialogDescription>
-            {order ? dayMonthTime(order.createdAt) : "Yuklanmoqda…"}
-          </DialogDescription>
+          <div className="flex flex-wrap items-end gap-x-4 gap-y-1 pr-8">
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="tabular truncate">
+                {order ? order.orderNumber : "Buyurtma"}
+              </DialogTitle>
+              <DialogDescription>
+                {order ? dayMonthYearTime(order.createdAt) : "Yuklanmoqda…"}
+              </DialogDescription>
+            </div>
+            {/* The figure the dialog is opened for, at the top rather than
+                four scrolls down at the end of the money list. */}
+            {order && (
+              <div className="shrink-0 text-right">
+                <p className="text-label-xs text-text-tertiary">Jami</p>
+                <p className="text-display-sm tabular leading-none">
+                  {money.plain(order.totalAmount)}
+                </p>
+              </div>
+            )}
+          </div>
         </DialogHeader>
 
         {error && !order ? (
@@ -149,63 +164,16 @@ function OrderDetailBody({ order }: { order: OrderDetail }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="border-border flex items-center gap-3 rounded-md border p-3">
-          <AppAvatar
-            name={orderDisplayClientName(order)}
-            imageUrl={order.client.avatarUrl}
-            size={44}
-          />
-          <div className="min-w-0 flex-1">
-            <p className="text-label-xs text-text-tertiary">Mijoz</p>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {order.client.id > 0 ? (
-                <Link
-                  href={clientDetailPath(order.client.id)}
-                  className="text-title-sm focus-visible:ring-ring truncate rounded-sm hover:underline focus-visible:ring-2 focus-visible:outline-none"
-                >
-                  {orderDisplayClientName(order)}
-                </Link>
-              ) : (
-                <span className="text-title-sm truncate">
-                  {orderDisplayClientName(order)}
-                </span>
-              )}
-            </div>
-            <p className="text-caption text-text-tertiary tabular truncate">
-              {phoneFromApi(order.clientPhone || order.client.phone)}
-            </p>
-          </div>
-        </div>
-
-        {/* The doctor gets a face too: reception recognises the photo faster
-            than the name when checking whose commission a sale carries. */}
-        <div className="border-border flex items-center gap-3 rounded-md border p-3">
-          {order.doctor.fullName !== "" ? (
-            <>
-              <AppAvatar name={order.doctor.fullName} imageUrl={doctorAvatar} size={44} />
-              <div className="min-w-0 flex-1">
-                <p className="text-label-xs text-text-tertiary">Shifokor</p>
-                <p className="text-title-sm truncate">{order.doctor.fullName}</p>
-                <p className="text-caption text-text-tertiary truncate">
-                  {doctorSpecialty !== "" && `${doctorSpecialty} · `}
-                  {percent.labeled(order.commissionPercent)}
-                </p>
-              </div>
-            </>
-          ) : (
-            <div className="min-w-0 flex-1">
-              <p className="text-label-xs text-text-tertiary">Shifokor</p>
-              <p className="text-body-sm text-text-tertiary">Belgilanmagan</p>
-            </div>
-          )}
-        </div>
-      </div>
-
       <div className="flex flex-wrap items-center gap-1.5">
         {order.status === "cancelled" && <Badge tone="danger">Bekor qilingan</Badge>}
         {order.orderType === "delivery" && <Badge>{ORDER_TYPE_LABEL.delivery}</Badge>}
         {order.buyerType === "staff" && <Badge>Xodim</Badge>}
+        {order.hasGift && (
+          <Badge tone="primary">
+            <Gift className="size-3" aria-hidden />
+            Sovg&rsquo;a
+          </Badge>
+        )}
         {!order.isReception && <Badge tone="info">Ilovadan</Badge>}
         {order.isEdited && <Badge tone="warning">Tahrirlangan</Badge>}
         {order.createdByName !== "" && (
@@ -215,65 +183,147 @@ function OrderDetailBody({ order }: { order: OrderDetail }) {
         )}
       </div>
 
-      <ul className="border-border rounded-md border">
-        {order.items.map((line, index) => (
-          <li
-            key={`${line.id}-${index}`}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2.5",
-              index > 0 && "border-surface-alt border-t",
+      {/*
+        Two columns on a wide screen: WHAT was sold on the left, WHAT IT COST on
+        the right. One tall column meant the desk scrolled past twenty lines to
+        reach the total — the figure the dialog is usually opened for.
+      */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+        <div className="flex min-w-0 flex-col gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <PersonCard
+              label="Mijoz"
+              name={orderDisplayClientName(order)}
+              avatarUrl={order.client.avatarUrl}
+              caption={phoneFromApi(order.clientPhone || order.client.phone)}
+              href={order.client.id > 0 ? clientDetailPath(order.client.id) : null}
+            />
+            {order.doctor.fullName !== "" ? (
+              <PersonCard
+                label="Shifokor"
+                name={order.doctor.fullName}
+                avatarUrl={doctorAvatar}
+                caption={
+                  (doctorSpecialty !== "" ? `${doctorSpecialty} · ` : "") +
+                  percent.labeled(order.commissionPercent)
+                }
+              />
+            ) : (
+              <div className="border-border flex flex-col justify-center rounded-md border p-3">
+                <p className="text-label-xs text-text-tertiary">Shifokor</p>
+                <p className="text-body-sm text-text-tertiary">Belgilanmagan</p>
+              </div>
             )}
+          </div>
+
+          <div>
+            <div className="mb-1.5 flex items-baseline gap-2">
+              <h3 className="text-label text-text-secondary">Mahsulotlar</h3>
+              <span className="text-caption text-text-tertiary tabular">
+                {order.items.length} nom · {orderUnitCount(order)} dona
+              </span>
+            </div>
+            <ul className="border-border overflow-hidden rounded-md border">
+              {order.items.map((line, index) => (
+                <li
+                  key={`${line.id}-${index}`}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5",
+                    index > 0 && "border-surface-alt border-t",
+                  )}
+                >
+                  <OrderLineRow line={line} />
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {order.note && (
+            <p className="border-border text-body-sm text-text-secondary rounded-md border p-3">
+              {order.note}
+            </p>
+          )}
+
+          {!isToday(order.createdAt) && (
+            <p className="text-caption text-warning">
+              Bu buyurtma bugungi emas — o&rsquo;zgartirish uchun PIN-kod so&rsquo;raladi.
+            </p>
+          )}
+        </div>
+
+        <dl className="bg-surface-alt/60 flex flex-col gap-2 rounded-md p-3.5 lg:sticky lg:top-0">
+          {isTotalEdited(order) && order.originalTotal !== null && (
+            <Row
+              label="Qatorlar summasi"
+              value={money.plain(order.originalTotal)}
+              muted
+            />
+          )}
+          {overrideDelta !== 0 && (
+            <Row
+              label={overrideDelta < 0 ? "Chegirma" : "Qo'shimcha"}
+              value={money.signed(overrideDelta)}
+              tone={overrideDelta < 0 ? "primary" : "warning"}
+            />
+          )}
+          <Row label="Jami" value={money.plain(order.totalAmount)} strong />
+          {order.debt && (
+            <Row
+              label={`Qarzga · ${money.plain(order.debt.remaining)} qoldiq`}
+              value={money.plain(order.debt.amount)}
+              tone="warning"
+            />
+          )}
+          <Row
+            label="Kassaga tushdi"
+            value={money.plain(order.paidAmount)}
+            tone="primary"
+          />
+          <PaymentRows order={order} />
+          {order.commissionAmount > 0 && (
+            <Row
+              label={`Komissiya · ${percent.labeled(order.commissionPercent)}`}
+              value={money.plain(order.commissionAmount)}
+              muted
+            />
+          )}
+        </dl>
+      </div>
+    </div>
+  );
+}
+
+/** The client and the doctor, drawn the same way so the pair reads as a pair. */
+function PersonCard({
+  label,
+  name,
+  caption,
+  avatarUrl,
+  href,
+}: {
+  label: string;
+  name: string;
+  caption: string;
+  avatarUrl: string | null;
+  href?: string | null;
+}) {
+  return (
+    <div className="border-border flex items-center gap-3 rounded-md border p-3">
+      <AppAvatar name={name} imageUrl={avatarUrl} size={40} />
+      <div className="min-w-0 flex-1">
+        <p className="text-label-xs text-text-tertiary">{label}</p>
+        {href ? (
+          <Link
+            href={href}
+            className="text-title-sm focus-visible:ring-ring block truncate rounded-sm hover:underline focus-visible:ring-2 focus-visible:outline-none"
           >
-            <OrderLineRow line={line} />
-          </li>
-        ))}
-      </ul>
-
-      <dl className="bg-surface-alt/60 flex flex-col gap-2 rounded-md p-3.5">
-        {isTotalEdited(order) && order.originalTotal !== null && (
-          <Row label="Qatorlar summasi" value={money.plain(order.originalTotal)} muted />
+            {name}
+          </Link>
+        ) : (
+          <p className="text-title-sm truncate">{name}</p>
         )}
-        {overrideDelta !== 0 && (
-          <Row
-            label={overrideDelta < 0 ? "Chegirma" : "Qo'shimcha"}
-            value={money.signed(overrideDelta)}
-            tone={overrideDelta < 0 ? "primary" : "warning"}
-          />
-        )}
-        <Row label="Jami" value={money.plain(order.totalAmount)} strong />
-        {order.debt && (
-          <Row
-            label={`Qarzga · ${money.plain(order.debt.remaining)} qoldiq`}
-            value={money.plain(order.debt.amount)}
-            tone="warning"
-          />
-        )}
-        <Row
-          label="Kassaga tushdi"
-          value={money.plain(order.paidAmount)}
-          tone="primary"
-        />
-        <PaymentRows order={order} />
-        {order.commissionAmount > 0 && (
-          <Row
-            label={`Komissiya · ${percent.labeled(order.commissionPercent)}`}
-            value={money.plain(order.commissionAmount)}
-            muted
-          />
-        )}
-      </dl>
-
-      {order.note && (
-        <p className="border-border text-body-sm text-text-secondary rounded-md border p-3">
-          {order.note}
-        </p>
-      )}
-
-      {!isToday(order.createdAt) && (
-        <p className="text-caption text-warning">
-          Bu buyurtma bugungi emas — o&rsquo;zgartirish uchun PIN-kod so&rsquo;raladi.
-        </p>
-      )}
+        <p className="text-caption text-text-tertiary tabular truncate">{caption}</p>
+      </div>
     </div>
   );
 }

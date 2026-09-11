@@ -8,7 +8,7 @@ import { SectionHeader } from "@/shared/components/data-display/section-header";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { formatUnits } from "@/shared/domain/packaging";
 import { money } from "@/shared/lib/format/money";
-import { resolveMediaUrl } from "@/shared/lib/media";
+import { MediaImage } from "@/shared/components/ui/media-image";
 import { cn } from "@/shared/lib/utils";
 
 import type { ProductStat } from "../types/statistics";
@@ -105,7 +105,6 @@ function ProductRow({
 }) {
   const value = sort === "revenue" ? product.revenue : product.unitsSold;
   const width = max > 0 ? Math.max(2, Math.round((value / max) * 100)) : 0;
-  const image = resolveMediaUrl(product.imageUrl);
 
   return (
     <li className="flex items-center gap-3">
@@ -113,9 +112,13 @@ function ProductRow({
         className="bg-surface-alt flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-sm"
         aria-hidden
       >
-        {image ? (
-          // eslint-disable-next-line @next/next/no-img-element -- arbitrary-origin thumbnail in a long list
-          <img src={image} alt="" loading="lazy" className="size-full object-cover" />
+        {product.imageUrl ? (
+          <MediaImage
+            src={product.imageUrl}
+            alt=""
+            size={40}
+            className="size-full object-cover"
+          />
         ) : (
           <ImageOff className="text-text-tertiary size-5" />
         )}

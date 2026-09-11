@@ -33,8 +33,11 @@ import { useState } from "react";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { PaginationBar } from "@/shared/components/data-display/pagination-bar";
+import { DateFilter } from "@/shared/components/data-display/date-filter";
 import { Skeleton } from "@/shared/components/ui/skeleton";
-import { shortDateTime } from "@/shared/lib/format/date";
+import type { DateRange } from "@/shared/domain/date-range";
+import { rangeLabel } from "@/shared/domain/date-range-label";
+import { addDays, shortDateTime } from "@/shared/lib/format/date";
 import { money } from "@/shared/lib/format/money";
 import { cn } from "@/shared/lib/utils";
 
@@ -97,13 +100,37 @@ const TONE_CLASS: Readonly<Record<EventTone, string>> = {
  */
 export function ClientTimeline({ clientId }: { clientId: number }) {
   const [filter, setFilter] = useState<ClientEventFilter>("all");
+  const [range, setRange] = useState<DateRange | null>(null);
   const [page, setPage] = useState(1);
 
-  const timeline = useClientTimelineQuery({ clientId, filter, page });
+  const timeline = useClientTimelineQuery({
+    clientId,
+    filter,
+    page,
+    dateFrom: range?.start ?? null,
+    // The app's range end is exclusive; the API's `date_to` is inclusive.
+    dateTo: range ? addDays(range.end, -1) : null,
+  });
   const events = timeline.data?.results ?? [];
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <DateFilter
+          value={range}
+          onChange={(next) => {
+            setRange(next);
+            setPage(1);
+          }}
+          steppable={false}
+        />
+        {range && (
+          <span className="text-caption text-text-tertiary">
+            {rangeLabel(range)} oralig&rsquo;idagi hodisalar
+          </span>
+        )}
+      </div>
+
       <div role="tablist" aria-label="Hodisa turi" className="flex flex-wrap gap-1.5">
         {CLIENT_EVENT_FILTERS.map((option) => (
           <button

@@ -71,6 +71,12 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# The image optimiser's cache. Created here, owned by the runtime user, so the
+# named volume mounted over it (see docker-compose.yml) inherits that
+# ownership — otherwise a root-owned mount would silently disable the cache and
+# every restart would re-shrink every product photo from its 3 MB original.
+RUN mkdir -p .next/cache/images && chown -R nextjs:nodejs .next/cache
+
 USER nextjs
 EXPOSE 3000
 

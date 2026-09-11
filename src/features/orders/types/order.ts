@@ -215,6 +215,19 @@ export interface OrderSummary {
   readonly debtStatus: DebtStatus | null;
 }
 
+/**
+ * The tail of `ORD-20260910165609-F815` — `F815`.
+ *
+ * A list row has no room for the full number: at any readable size it wraps
+ * onto three lines and drags every row to twice its height. The tail is what
+ * the desk reads out to a client anyway; the full number stays one click away
+ * in the detail dialog, and on the row's `title`.
+ */
+export function shortOrderNumber(orderNumber: string): string {
+  const tail = orderNumber.split("-").at(-1) ?? "";
+  return tail !== "" && tail !== orderNumber ? tail : orderNumber;
+}
+
 /** True when this order's debt has slipped past its due date. */
 export function isOrderDebtOverdue(o: OrderSummary): boolean {
   if (!o.hasDebt || o.debtDueDate === null) return false;

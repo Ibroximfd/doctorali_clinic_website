@@ -3,7 +3,7 @@
 import { ArrowLeft, Check } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 
 import { AppRoutes } from "@/config/routes";
 import { PageContainer } from "@/shared/components/data-display/page-container";
@@ -12,6 +12,7 @@ import { money } from "@/shared/lib/format/money";
 
 import { useNewOrderSession } from "../hooks/use-new-order-session";
 import { selectSubtotal, useNewOrderStore } from "../store/new-order-store";
+import type { Product } from "@/features/products/types/product";
 import { OrderCartPanel } from "./order-cart-panel";
 import { ProductPicker } from "./product-picker";
 
@@ -31,8 +32,20 @@ export function ProductSelectView() {
   const { previewPending, previewFailed } = useNewOrderSession();
 
   const router = useRouter();
-  const state = useNewOrderStore();
-  const { cart, addProduct, setQuantity } = state;
+  /*
+   * Slices, not the whole store: this screen holds the sixty-card grid, and a
+   * whole-store subscription re-rendered all of it on every field the form
+   * touched — the note, the phone, each pricing answer from the server.
+   */
+  const cart = useNewOrderStore((s) => s.cart);
+  const addProduct = useNewOrderStore((s) => s.addProduct);
+  const setQuantity = useNewOrderStore((s) => s.setQuantity);
+  const subtotal = useNewOrderStore(selectSubtotal);
+
+  const setProductQuantity = useCallback(
+    (product: Product, quantity: number) => setQuantity(product.id, quantity),
+    [setQuantity],
+  );
 
   const quantities = useMemo(
     () => Object.fromEntries(cart.map((item) => [item.product.id, item.quantity])),
@@ -81,7 +94,7 @@ export function ProductSelectView() {
         {cart.length > 0 && (
           <p className="text-caption text-text-secondary tabular min-w-0 truncate">
             {cart.length} ta nom · {units} dona ·{" "}
-            <span className="text-title-sm">{money.uzs(selectSubtotal(state))}</span>
+            <span className="text-title-sm">{money.uzs(subtotal)}</span>
             {/* The sum is the server's. Until it answers — or if it can't —
                 the figure is the local estimate and says so, because a box is
                 rarely nine unit prices. */}
@@ -110,7 +123,7 @@ export function ProductSelectView() {
           <ProductPicker
             quantities={quantities}
             onAdd={addProduct}
-            onQuantityChange={(product, quantity) => setQuantity(product.id, quantity)}
+            onQuantityChange={setProductQuantity}
           />
         </section>
 

@@ -29,6 +29,7 @@ import {
 } from "@/features/statistics/lib/chart-series";
 import { AppCard } from "@/shared/components/data-display/app-card";
 import { PageContainer } from "@/shared/components/data-display/page-container";
+import { DateFilter } from "@/shared/components/data-display/date-filter";
 import { PeriodSelector } from "@/shared/components/data-display/period-selector";
 import { SectionHeader } from "@/shared/components/data-display/section-header";
 import { StatCard } from "@/shared/components/data-display/stat-card";
@@ -36,15 +37,20 @@ import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { AppAvatar } from "@/shared/components/ui/app-avatar";
 import { Skeleton } from "@/shared/components/ui/skeleton";
-import type { StatPeriod } from "@/shared/domain/date-range";
+import type { DateRange } from "@/shared/domain/date-range";
+import { periodForRange, resolveRange } from "@/shared/domain/date-range";
 import { formatUnits } from "@/shared/domain/packaging";
 import { money } from "@/shared/lib/format/money";
 import { percent } from "@/shared/lib/format/percent";
 
 /** One doctor's period: the KPIs, the commission trend and what they sold. */
 export function DoctorDetailView({ doctorId }: { doctorId: string }) {
-  const [period, setPeriod] = useState<StatPeriod>("monthly");
-  const query = useMemo<StatsQuery>(() => ({ period }), [period]);
+  const [range, setRange] = useState<DateRange>(() => resolveRange("monthly"));
+  const period = periodForRange(range);
+  const query = useMemo<StatsQuery>(
+    () => ({ period: periodForRange(range), custom: range }),
+    [range],
+  );
 
   const { data, error, isPending, isFetching, refetch } = useDoctorDetailQuery(
     doctorId,
@@ -67,7 +73,19 @@ export function DoctorDetailView({ doctorId }: { doctorId: string }) {
           <ArrowLeft className="size-[17px]" />
         </Link>
         <div className="flex-1" />
-        <PeriodSelector value={period} onChange={setPeriod} granularity />
+        <div className="hidden md:block">
+          <PeriodSelector
+            value={period}
+            onChange={(next) => setRange(resolveRange(next, { custom: range }))}
+            granularity
+          />
+        </div>
+        <DateFilter
+          value={range}
+          onChange={(next) => next && setRange(next)}
+          clearable={false}
+          align="end"
+        />
       </div>
 
       {error && !data ? (

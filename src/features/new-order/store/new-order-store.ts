@@ -784,13 +784,15 @@ export function canEditTotal(state: NewOrderState): boolean {
 }
 
 /** A delivery never earns the loyalty gift — the sale isn't in the app history. */
-export function selectGiftEligible(state: NewOrderState): boolean {
+export function selectGiftEligible(
+  state: Pick<NewOrderState, "orderType" | "client">,
+): boolean {
   return (
     allowsGift(state.orderType) && (state.client?.giftStatus?.giftAvailable ?? false)
   );
 }
 
-export function selectIsDelivery(state: NewOrderState): boolean {
+export function selectIsDelivery(state: Pick<NewOrderState, "orderType">): boolean {
   return state.orderType === "delivery";
 }
 

@@ -21,8 +21,24 @@ import { clientKeys } from "./use-client-search";
 export const profileKeys = {
   byId: (id: number) => [...clientKeys.all, "profile", id] as const,
   byPhone: (phone: string) => [...clientKeys.all, "profile", "phone", phone] as const,
-  timeline: (id: number, filter: ClientEventFilter, page: number) =>
-    [...clientKeys.all, "timeline", id, filter, page] as const,
+  timeline: (
+    id: number,
+    filter: ClientEventFilter,
+    page: number,
+    // The range belongs in the KEY: without it a date filter would read a
+    // cached page from a different period and quietly show the wrong history.
+    dateFrom: TashkentDate | null = null,
+    dateTo: TashkentDate | null = null,
+  ) =>
+    [
+      ...clientKeys.all,
+      "timeline",
+      id,
+      filter,
+      page,
+      dateFrom?.getTime() ?? null,
+      dateTo?.getTime() ?? null,
+    ] as const,
   tab: (id: number, tab: string, page: number) =>
     [...clientKeys.all, "tab", id, tab, page] as const,
 };
@@ -58,7 +74,13 @@ export function useClientTimelineQuery(input: {
   enabled?: boolean;
 }) {
   return useQuery({
-    queryKey: profileKeys.timeline(input.clientId, input.filter, input.page),
+    queryKey: profileKeys.timeline(
+      input.clientId,
+      input.filter,
+      input.page,
+      input.dateFrom ?? null,
+      input.dateTo ?? null,
+    ),
     queryFn: ({ signal }) =>
       fetchTimeline({
         clientId: input.clientId,

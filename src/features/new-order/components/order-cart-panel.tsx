@@ -8,11 +8,9 @@ import { Button } from "@/shared/components/ui/button";
 import { money } from "@/shared/lib/format/money";
 import { cn } from "@/shared/lib/utils";
 
-import {
-  selectServerLineTotal,
-  selectSubtotal,
-  useNewOrderStore,
-} from "../store/new-order-store";
+import { paidLineFor } from "@/features/orders/types/order-preview";
+
+import { selectSubtotal, useNewOrderStore } from "../store/new-order-store";
 import { CartLineRow } from "./cart-line-row";
 
 /**
@@ -37,8 +35,15 @@ export function OrderCartPanel({
   /** True while the server hasn't priced this basket — the sum says "taxminiy". */
   priceIsEstimate?: boolean;
 }) {
-  const state = useNewOrderStore();
-  const { cart, setQuantity, setLinePrice, setLineGift, removeProduct } = state;
+  // Slices only — see `ProductSelectView`. The actions are stable references,
+  // which is what lets each memoised row skip a render it has no part in.
+  const cart = useNewOrderStore((s) => s.cart);
+  const preview = useNewOrderStore((s) => s.preview);
+  const subtotal = useNewOrderStore(selectSubtotal);
+  const setQuantity = useNewOrderStore((s) => s.setQuantity);
+  const setLinePrice = useNewOrderStore((s) => s.setLinePrice);
+  const setLineGift = useNewOrderStore((s) => s.setLineGift);
+  const removeProduct = useNewOrderStore((s) => s.removeProduct);
   const units = cart.reduce((sum, item) => sum + item.quantity + item.giftQuantity, 0);
 
   return (
@@ -58,7 +63,7 @@ export function OrderCartPanel({
           <p className="text-caption text-text-secondary tabular mt-0.5">
             {cart.length === 0
               ? "Hozircha bo'sh"
-              : `${cart.length} ta nom · ${units} dona · ${money.plain(selectSubtotal(state))}${
+              : `${cart.length} ta nom · ${units} dona · ${money.plain(subtotal)}${
                   priceIsEstimate ? " (taxminiy)" : ""
                 }`}
           </p>
@@ -94,11 +99,15 @@ export function OrderCartPanel({
               >
                 <CartLineRow
                   item={item}
-                  serverLineTotal={selectServerLineTotal(state, item.product.id)}
-                  onQuantityChange={(quantity) => setQuantity(item.product.id, quantity)}
-                  onPriceChange={(input) => setLinePrice(item.product.id, input)}
-                  onGiftChange={(gift) => setLineGift(item.product.id, gift)}
-                  onRemove={() => removeProduct(item.product.id)}
+                  serverLineTotal={
+                    preview
+                      ? (paidLineFor(preview, item.product.id)?.lineTotal ?? null)
+                      : null
+                  }
+                  onQuantityChange={setQuantity}
+                  onPriceChange={setLinePrice}
+                  onGiftChange={setLineGift}
+                  onRemove={removeProduct}
                 />
               </li>
             ))}

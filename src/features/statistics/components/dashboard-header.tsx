@@ -2,58 +2,59 @@
 
 import { Download, MoonStar } from "lucide-react";
 
-import { DateRangePicker } from "@/shared/components/data-display/date-range-picker";
+import { DateFilter } from "@/shared/components/data-display/date-filter";
 import { PeriodSelector } from "@/shared/components/data-display/period-selector";
 import { Button } from "@/shared/components/ui/button";
-import type { DateRange, StatPeriod } from "@/shared/domain/date-range";
-import { resolveRange } from "@/shared/domain/date-range";
-import { periodFilterLabel, rangeLabelShort } from "@/shared/domain/date-range-label";
+import type { DateRange } from "@/shared/domain/date-range";
+import { periodForRange, resolveRange } from "@/shared/domain/date-range";
+import { rangeLabel } from "@/shared/domain/date-range-label";
 
 /**
- * Period selector, the end-of-shift report and the Excel export.
+ * The period the whole dashboard is read through, the end-of-shift report and
+ * the Excel export.
+ *
+ * ONE source of truth — the range. The segmented control is the fast path to
+ * the four named periods; the date filter beside it answers everything else
+ * ("the 3rd", "1–15 sentabr"), which the segments alone could not express at
+ * all. Both write the same range, so neither can ever contradict the figures.
  *
  * Payment type is intentionally NOT a dashboard filter: the per-till breakdown
  * already reports real cash-in per type, split slices included — a
  * `payment_type` filter here would drop mixed orders and show a misleading 0.
  */
 export function DashboardHeader({
-  period,
-  customRange,
-  onPeriodChange,
-  onCustomRangeChange,
+  range,
+  onRangeChange,
   onCloseDay,
   onExport,
   exporting,
 }: {
-  period: StatPeriod;
-  customRange: DateRange | null;
-  onPeriodChange: (period: StatPeriod) => void;
-  onCustomRangeChange: (range: DateRange) => void;
+  range: DateRange;
+  onRangeChange: (range: DateRange) => void;
   onCloseDay: () => void;
   onExport: () => void;
   exporting: boolean;
 }) {
-  const range = resolveRange(period, { custom: customRange });
+  const period = periodForRange(range);
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="min-w-0 flex-1 overflow-x-auto">
+        <div className="min-w-0 overflow-x-auto">
           <PeriodSelector
             value={period}
-            onChange={onPeriodChange}
+            onChange={(next) => onRangeChange(resolveRange(next, { custom: range }))}
             granularity
-            includeCustom={false}
           />
         </div>
 
-        <DateRangePicker
-          value={customRange}
-          onChange={onCustomRangeChange}
-          triggerLabel={
-            period === "custom" && customRange ? rangeLabelShort(customRange) : "Davr"
-          }
+        <DateFilter
+          value={range}
+          onChange={(next) => next && onRangeChange(next)}
+          clearable={false}
         />
+
+        <div className="flex-1" />
 
         {/* How reception ends a shift: the day's till, credit and tomorrow's
             bookings in one place. */}
@@ -79,15 +80,15 @@ export function DashboardHeader({
       <div className="flex items-center gap-2">
         <span className="text-caption text-text-tertiary">Filtr:</span>
         <span className="bg-primary-soft text-label-sm text-primary-dark rounded-full px-2.5 py-1">
-          {periodFilterLabel(period, range)}
+          {rangeLabel(range)}
         </span>
         {period !== "daily" && (
           <button
             type="button"
-            onClick={() => onPeriodChange("daily")}
+            onClick={() => onRangeChange(resolveRange("daily"))}
             className="text-caption text-text-tertiary hover:text-text-primary focus-visible:ring-ring rounded-sm px-1 focus-visible:ring-2 focus-visible:outline-none"
           >
-            Bekor qilish
+            Bugunga qaytish
           </button>
         )}
       </div>

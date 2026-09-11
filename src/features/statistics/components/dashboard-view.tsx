@@ -10,7 +10,8 @@ import { TodayAppointmentsCard } from "@/features/appointments/components/today-
 import { PageContainer } from "@/shared/components/data-display/page-container";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { Skeleton } from "@/shared/components/ui/skeleton";
-import type { DateRange, StatPeriod } from "@/shared/domain/date-range";
+import type { DateRange } from "@/shared/domain/date-range";
+import { periodForRange, resolveRange } from "@/shared/domain/date-range";
 import type { PaymentType } from "@/shared/domain/payment-type";
 
 import type { StatsQuery } from "../api/statistics-api";
@@ -44,14 +45,19 @@ const RevenueChartCard = dynamic(
  * till → what was done → the trend → the detail.
  */
 export function DashboardView() {
-  const [period, setPeriod] = useState<StatPeriod>("daily");
-  const [customRange, setCustomRange] = useState<DateRange | null>(null);
+  /*
+   * The dashboard is filtered by a RANGE, and the period name is derived from
+   * it — the segmented control and the date filter are then two ways of setting
+   * one value rather than two settings that can disagree.
+   */
+  const [range, setRange] = useState<DateRange>(() => resolveRange("daily"));
   const [tillType, setTillType] = useState<PaymentType | null>(null);
   const [closingOpen, setClosingOpen] = useState(false);
 
+  const period = periodForRange(range);
   const query = useMemo<StatsQuery>(
-    () => ({ period, custom: customRange }),
-    [period, customRange],
+    () => ({ period: periodForRange(range), custom: range }),
+    [range],
   );
 
   const { data, error, isPending, isFetching, refetch } = useDashboardQuery(query);
@@ -62,11 +68,6 @@ export function DashboardView() {
     [data, period],
   );
 
-  function handleCustomRange(range: DateRange) {
-    setCustomRange(range);
-    setPeriod("custom");
-  }
-
   function handleOpenTill(type: PaymentType) {
     setTillType(type);
   }
@@ -74,10 +75,8 @@ export function DashboardView() {
   return (
     <PageContainer className="flex flex-col gap-4">
       <DashboardHeader
-        period={period}
-        customRange={customRange}
-        onPeriodChange={setPeriod}
-        onCustomRangeChange={handleCustomRange}
+        range={range}
+        onRangeChange={setRange}
         onCloseDay={() => setClosingOpen(true)}
         onExport={() => exportMutation.mutate(query)}
         exporting={exportMutation.isPending}

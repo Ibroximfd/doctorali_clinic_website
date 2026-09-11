@@ -171,6 +171,11 @@ export function dayMonthTime(d: Date): string {
   return `${dayMonth(d)}, ${hhmm(d)}`;
 }
 
+/** `9 sentabr 2026, 14:30` — the full stamp a record's header carries. */
+export function dayMonthYearTime(d: Date): string {
+  return `${dayMonthYear(d)}, ${hhmm(d)}`;
+}
+
 /** `09.09.2026` */
 export function shortDate(d: Date): string {
   return `${pad(d.getUTCDate())}.${pad(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`;
@@ -217,4 +222,21 @@ export function relativeDay(d: Date): string {
   if (diff === -1) return "Kecha";
   if (diff === 1) return "Ertaga";
   return dayMonth(d);
+}
+
+/**
+ * Calendar captions for `react-day-picker`.
+ *
+ * The one deliberate exception to "read UTC fields": the picker builds its own
+ * grid from LOCAL dates, so these two read local fields. They exist only to put
+ * Uzbek month and weekday names on the calendar — every date that carries
+ * meaning still goes through the Tashkent helpers above.
+ */
+export function localMonthCaption(d: Date): string {
+  return `${MONTHS_UZ[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/** `Du` `Se` `Cho` … — the calendar's weekday header. */
+export function localWeekdayShort(d: Date): string {
+  return WEEKDAYS_UZ[(d.getDay() + 6) % 7].slice(0, 3);
 }

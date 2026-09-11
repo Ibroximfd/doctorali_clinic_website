@@ -12,19 +12,16 @@ import { AppCard } from "@/shared/components/data-display/app-card";
 import { ListSkeleton } from "@/shared/components/data-display/list-skeleton";
 import { PageContainer } from "@/shared/components/data-display/page-container";
 import { PaginationBar } from "@/shared/components/data-display/pagination-bar";
+import { DateFilter } from "@/shared/components/data-display/date-filter";
+import { FilterBar, SortSelect } from "@/shared/components/data-display/filter-bar";
 import { PeriodSelector } from "@/shared/components/data-display/period-selector";
 import { SearchField } from "@/shared/components/data-display/search-field";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { AppAvatar } from "@/shared/components/ui/app-avatar";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select";
-import type { StatPeriod } from "@/shared/domain/date-range";
+import type { DateRange } from "@/shared/domain/date-range";
+import { periodForRange, resolveRange } from "@/shared/domain/date-range";
+import { rangeLabel } from "@/shared/domain/date-range-label";
 import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
 import { money } from "@/shared/lib/format/money";
 import { percent } from "@/shared/lib/format/percent";
@@ -40,13 +37,17 @@ const PAGE_SIZE = 20;
 
 /** "Shifokorlar" — who sold what, and what the clinic owes them for it. */
 export function DoctorsView() {
-  const [period, setPeriod] = useState<StatPeriod>("monthly");
+  const [range, setRange] = useState<DateRange>(() => resolveRange("monthly"));
   const [ordering, setOrdering] = useState<string>("-revenue");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
   const debouncedSearch = useDebouncedValue(search);
-  const query = useMemo<StatsQuery>(() => ({ period }), [period]);
+  const period = periodForRange(range);
+  const query = useMemo<StatsQuery>(
+    () => ({ period: periodForRange(range), custom: range }),
+    [range],
+  );
 
   const { data, error, isPending, isFetching, refetch } = useDoctorStatsQuery({
     query,
@@ -64,28 +65,39 @@ export function DoctorsView() {
 
   return (
     <PageContainer className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
+      <FilterBar
+        action={
+          <SortSelect
+            value={ordering}
+            onChange={reset(setOrdering)}
+            options={ORDERINGS}
+          />
+        }
+      >
         <SearchField
           value={search}
           onChange={reset(setSearch)}
           placeholder="Shifokor ismi…"
-          className="w-full sm:w-[280px]"
+          className="w-full sm:w-[260px]"
         />
-        <PeriodSelector value={period} onChange={reset(setPeriod)} granularity />
-        <div className="flex-1" />
-        <Select value={ordering} onValueChange={reset(setOrdering)}>
-          <SelectTrigger className="w-[190px]" aria-label="Saralash">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {ORDERINGS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+        <div className="hidden md:block">
+          <PeriodSelector
+            value={period}
+            onChange={(next) => reset(setRange)(resolveRange(next, { custom: range }))}
+            granularity
+          />
+        </div>
+        <DateFilter
+          value={range}
+          onChange={(next) => next && reset(setRange)(next)}
+          clearable={false}
+        />
+      </FilterBar>
+
+      <p className="text-caption text-text-tertiary">
+        Ko&rsquo;rsatkichlar davri:{" "}
+        <span className="text-text-secondary">{rangeLabel(range)}</span>
+      </p>
 
       <AppCard padded={false} className="overflow-hidden">
         {error && !data ? (
