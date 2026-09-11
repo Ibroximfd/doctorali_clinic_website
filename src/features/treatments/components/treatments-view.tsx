@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Ban, Plus, Stethoscope } from "lucide-react";
+import { Activity, Ban, Pencil, Plus, Stethoscope, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -46,6 +46,7 @@ import { cn } from "@/shared/lib/utils";
 import type { TreatmentFilter } from "../api/treatments-api";
 import {
   useCancelTreatment,
+  useDeleteTreatment,
   useTreatmentSummaryQuery,
   useTreatmentsQuery,
 } from "../hooks/use-treatments";
@@ -59,6 +60,7 @@ import {
   type TreatmentKind,
   type TreatmentStatus,
 } from "../types/treatment";
+import { TreatmentEditDialog } from "./treatment-edit-dialog";
 import { TreatmentFormDialog } from "./treatment-form-dialog";
 
 const PAGE_SIZE = 20;
@@ -77,10 +79,13 @@ export function TreatmentsView() {
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [cancelling, setCancelling] = useState<Treatment | null>(null);
+  const [editing, setEditing] = useState<Treatment | null>(null);
+  const [deleting, setDeleting] = useState<Treatment | null>(null);
 
   const debouncedSearch = useDebouncedValue(search);
   const pinGate = usePinGate();
   const cancel = useCancelTreatment();
+  const remove = useDeleteTreatment();
 
   const filter = useMemo<TreatmentFilter>(
     () => ({
@@ -316,6 +321,8 @@ export function TreatmentsView() {
                 >
                   <TreatmentRow
                     treatment={treatment}
+                    onEdit={() => setEditing(treatment)}
+                    onDelete={() => setDeleting(treatment)}
                     onCancel={() => setCancelling(treatment)}
                   />
                 </li>
@@ -354,15 +361,48 @@ export function TreatmentsView() {
         }
         confirmLabel="Bekor qilish"
       />
+
+      <TreatmentEditDialog
+        treatment={editing}
+        open={editing !== null}
+        onOpenChange={(open) => !open && setEditing(null)}
+      />
+
+      {/* `DELETE treatments/{id}/` — audited by reason and gated by the PIN
+          whatever day the service belongs to. */}
+      <ReasonDialog
+        open={deleting !== null}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        busy={remove.isPending}
+        title="Muolajani o'chirish"
+        description={
+          deleting
+            ? `${treatmentClientName(deleting)} · ${money.uzs(deleting.amount)} — yozuv butunlay o'chadi.`
+            : undefined
+        }
+        confirmLabel="O'chirish"
+        onConfirm={(reason) => {
+          const treatment = deleting;
+          setDeleting(null);
+          if (!treatment) return;
+          pinGate.requestPin((pin) =>
+            remove.mutate({ id: treatment.id, reason, confirmPin: pin }),
+          );
+        }}
+      />
     </PageContainer>
   );
 }
 
 function TreatmentRow({
   treatment,
+  onEdit,
+  onDelete,
   onCancel,
 }: {
   treatment: Treatment;
+  onEdit: () => void;
+  onDelete: () => void;
   onCancel: () => void;
 }) {
   const cancelled = treatment.status === "cancelled";
@@ -452,9 +492,20 @@ function TreatmentRow({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={onEdit}>
+              <Pencil className="size-4" aria-hidden />
+              Tahrirlash
+            </DropdownMenuItem>
             <DropdownMenuItem onSelect={onCancel} className="text-danger">
               <Ban className="size-4" aria-hidden />
               Bekor qilish
+            </DropdownMenuItem>
+            {/* A cancel keeps the line in the history as cancelled; a delete
+                leaves no trace at all, so it is for entries that should never
+                have existed — and it always costs the PIN. */}
+            <DropdownMenuItem onSelect={onDelete} className="text-danger">
+              <Trash2 className="size-4" aria-hidden />
+              O&rsquo;chirish
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

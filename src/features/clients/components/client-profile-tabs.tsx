@@ -7,8 +7,9 @@ import type { ReactNode } from "react";
 import { AppointmentStatusChip } from "@/features/appointments/components/appointment-status-chip";
 import { appointmentPurposeLabel } from "@/features/appointments/types/appointment";
 import { DebtStatusBadge } from "@/features/debts/components/debt-status-badge";
-import { useStartOrderEdit } from "@/features/new-order/hooks/use-start-order-edit";
+import { OrderEditDialog } from "@/features/new-order/components/order-edit-dialog";
 import { OrderDetailDialog } from "@/features/orders/components/order-detail-dialog";
+import type { OrderDetail } from "@/features/orders/types/order";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { PaginationBar } from "@/shared/components/data-display/pagination-bar";
@@ -226,8 +227,8 @@ function VisitsTab({ clientId }: { clientId: number }) {
 function OrdersTab({ clientId }: { clientId: number }) {
   const [page, setPage] = useState(1);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<OrderDetail | null>(null);
   const query = useClientOrdersTab(clientId, page);
-  const edit = useStartOrderEdit();
 
   return (
     <>
@@ -275,8 +276,14 @@ function OrdersTab({ clientId }: { clientId: number }) {
         onOpenChange={(open) => !open && setDetailId(null)}
         onEdit={(order) => {
           setDetailId(null);
-          void edit.start(order);
+          setEditing(order);
         }}
+      />
+
+      <OrderEditDialog
+        order={editing}
+        open={editing !== null}
+        onOpenChange={(open) => !open && setEditing(null)}
       />
     </>
   );

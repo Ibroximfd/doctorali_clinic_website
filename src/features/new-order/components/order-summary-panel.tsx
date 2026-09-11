@@ -51,6 +51,7 @@ export function OrderSummaryPanel({
   onEditTotal,
   onSubmit,
   onReset,
+  resetLabel = "Tozalash",
   submitting,
   previewPending,
   previewFailed,
@@ -61,6 +62,8 @@ export function OrderSummaryPanel({
   onEditTotal: () => void;
   onSubmit: () => void;
   onReset: () => void;
+  /** "Tozalash" on a new order; "Bekor qilish" when an edit is being made. */
+  resetLabel?: string;
   submitting: boolean;
   previewPending: boolean;
   previewFailed: boolean;
@@ -290,7 +293,7 @@ export function OrderSummaryPanel({
 
       <div className="flex gap-2">
         <Button type="button" variant="outline" onClick={onReset} disabled={submitting}>
-          Tozalash
+          {resetLabel}
         </Button>
         <Button
           type="button"

@@ -6,8 +6,10 @@ import {
   CircleCheck,
   Download,
   HandCoins,
+  MoreVertical,
   TriangleAlert,
   Wallet,
+  XCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -28,8 +30,15 @@ import { PaginationBar } from "@/shared/components/data-display/pagination-bar";
 import { SearchField } from "@/shared/components/data-display/search-field";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { ErrorState } from "@/shared/components/feedback/error-state";
+import { ReasonDialog } from "@/shared/components/feedback/reason-dialog";
 import { AppAvatar } from "@/shared/components/ui/app-avatar";
 import { Button } from "@/shared/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/shared/components/ui/dropdown-menu";
 import type { DateRange } from "@/shared/domain/date-range";
 import { activeRangeLabel } from "@/shared/domain/date-range-label";
 import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
@@ -44,7 +53,12 @@ import {
   type DebtFilter,
   type DebtView,
 } from "../api/debts-api";
-import { useDebtSummaryQuery, useDebtsExport, useDebtsQuery } from "../hooks/use-debts";
+import {
+  useCancelDebt,
+  useDebtSummaryQuery,
+  useDebtsExport,
+  useDebtsQuery,
+} from "../hooks/use-debts";
 import {
   DEBT_SOURCE_LABEL,
   debtSourceLabel,
@@ -76,6 +90,8 @@ export function DebtsView() {
   const [page, setPage] = useState(1);
   const [paying, setPaying] = useState<Debt | null>(null);
   const [extending, setExtending] = useState<Debt | null>(null);
+  const [writingOff, setWritingOff] = useState<Debt | null>(null);
+  const writeOff = useCancelDebt();
 
   /*
    * The deadline window, the doctor behind the sale and where the debt came
@@ -315,6 +331,7 @@ export function DebtsView() {
                     debt={debt}
                     onPay={() => setPaying(debt)}
                     onExtend={() => setExtending(debt)}
+                    onWriteOff={() => setWritingOff(debt)}
                   />
                 </li>
               ))}
@@ -339,6 +356,27 @@ export function DebtsView() {
         debt={extending}
         open={extending !== null}
         onOpenChange={(open) => !open && setExtending(null)}
+      />
+
+      {/* `POST debts/{id}/cancel/` — the debt is closed and stays in the
+          reports as money that was never collected, so the reason is required
+          and the wording says the write-off cannot be undone. */}
+      <ReasonDialog
+        open={writingOff !== null}
+        onOpenChange={(open) => !open && setWritingOff(null)}
+        busy={writeOff.isPending}
+        title="Qarzni hisobdan chiqarish"
+        description={
+          writingOff
+            ? `${writingOff.client?.fullName ?? "Mijoz"} · ${money.uzs(writingOff.remaining)} — bu amal qaytarilmaydi.`
+            : undefined
+        }
+        confirmLabel="Hisobdan chiqarish"
+        onConfirm={(reason) => {
+          const debt = writingOff;
+          setWritingOff(null);
+          if (debt) writeOff.mutate({ id: debt.id, reason });
+        }}
       />
     </PageContainer>
   );
@@ -407,10 +445,12 @@ function DebtRow({
   debt,
   onPay,
   onExtend,
+  onWriteOff,
 }: {
   debt: Debt;
   onPay: () => void;
   onExtend: () => void;
+  onWriteOff: () => void;
 }) {
   const source = debtSourceRef(debt);
   const payable = isDebtPayable(debt);
@@ -487,6 +527,26 @@ function DebtRow({
             >
               <CalendarPlus className="size-4" />
             </Button>
+            {/* Writing a debt off is the rarest and least reversible thing on
+                this page, so it lives one click deeper than paying it. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Boshqa amallar"
+                  className="text-text-secondary"
+                >
+                  <MoreVertical className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={onWriteOff} className="text-danger">
+                  <XCircle className="size-4" aria-hidden />
+                  Hisobdan chiqarish
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </>
         )}
       </div>

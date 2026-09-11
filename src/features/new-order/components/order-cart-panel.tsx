@@ -27,6 +27,7 @@ export function OrderCartPanel({
   emptyMessage = "Mahsulotni qidiring va kartochkani bosing — u savatga tushadi.",
   action,
   priceIsEstimate = false,
+  compactEmpty = false,
 }: {
   className?: string;
   emptyMessage?: string;
@@ -34,6 +35,12 @@ export function OrderCartPanel({
   action?: ReactNode;
   /** True while the server hasn't priced this basket — the sum says "taxminiy". */
   priceIsEstimate?: boolean;
+  /**
+   * One line instead of the full empty state. The edit dialog shows the basket
+   * beside an open catalogue, where a 72px icon and three lines of text push
+   * the products themselves off the screen.
+   */
+  compactEmpty?: boolean;
 }) {
   // Slices only — see `ProductSelectView`. The actions are stable references,
   // which is what lets each memoised row skip a render it has no part in.
@@ -83,12 +90,19 @@ export function OrderCartPanel({
       </header>
 
       {cart.length === 0 ? (
-        <EmptyState
-          icon={ShoppingCart}
-          title="Savat bo'sh"
-          message={emptyMessage}
-          action={action}
-        />
+        compactEmpty ? (
+          <div className="flex flex-col gap-3 px-4 py-4">
+            <p className="text-caption text-text-secondary">{emptyMessage}</p>
+            {action}
+          </div>
+        ) : (
+          <EmptyState
+            icon={ShoppingCart}
+            title="Savat bo'sh"
+            message={emptyMessage}
+            action={action}
+          />
+        )
       ) : (
         <>
           <ul className="@container/cart min-h-0 flex-1 overflow-y-auto">

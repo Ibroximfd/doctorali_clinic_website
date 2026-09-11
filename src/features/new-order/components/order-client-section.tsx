@@ -1,11 +1,11 @@
 "use client";
 
-import { Gift, Smartphone, TriangleAlert, X } from "lucide-react";
+import { Gift, Smartphone, X } from "lucide-react";
 
 import { ClientSearchField } from "@/features/clients/components/client-search-field";
 import { searchResultName } from "@/features/clients/types/client-search";
+import { orderDisplayClientName } from "@/features/orders/types/order";
 import { DoctorPicker } from "@/features/doctors/components/doctor-picker";
-import { DateInput } from "@/shared/components/form/date-input";
 import { PhoneInput } from "@/shared/components/form/phone-input";
 import { AppAvatar } from "@/shared/components/ui/app-avatar";
 import { Button } from "@/shared/components/ui/button";
@@ -13,7 +13,6 @@ import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { BUYER_TYPE_LABEL, ORDER_TYPE_LABEL } from "@/shared/domain/order-type";
 import { money } from "@/shared/lib/format/money";
-import { nowTashkent, startOfDay } from "@/shared/lib/format/date";
 import { phoneFromApi, phoneToApi, formatPhoneInput } from "@/shared/lib/format/phone";
 import { cn } from "@/shared/lib/utils";
 
@@ -22,9 +21,10 @@ import {
   selectDoctorRequired,
   selectIsDelivery,
   selectIsEditing,
-  selectNeedsConfirmPin,
   useNewOrderStore,
+  type NewOrderState,
 } from "../store/new-order-store";
+import { OrderDateField } from "./order-date-field";
 
 /** "Kim uchun" — order type, buyer, client, doctor and the sale's date. */
 export function OrderClientSection() {
@@ -42,8 +42,6 @@ export function OrderClientSection() {
     setGuestPhone,
     doctor,
     setDoctor,
-    orderDate,
-    setOrderDate,
     showValidation,
     fieldErrors,
   } = state;
@@ -81,8 +79,17 @@ export function OrderClientSection() {
 
       {isEditing ? (
         <EditingClientCard
-          name={state.editingOrder?.clientName || "Mijoz"}
-          phone={state.editingOrder?.clientPhone ?? ""}
+          /*
+           * The sale-time snapshot first, then the client card, then the last
+           * four digits — the same fallback the orders list uses. Reading
+           * `clientName` alone left every order whose snapshot is empty (an
+           * older sale, a client added later) showing a bare "Mijoz" while the
+           * name sat right there on the order's client.
+           */
+          name={state.editingOrder ? orderDisplayClientName(state.editingOrder) : "Mijoz"}
+          phone={
+            state.editingOrder?.clientPhone || state.editingOrder?.client.phone || ""
+          }
         />
       ) : isDelivery ? (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -161,22 +168,7 @@ export function OrderClientSection() {
           />
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="order-date">Buyurtma sanasi</Label>
-          <DateInput
-            id="order-date"
-            value={orderDate}
-            onChange={setOrderDate}
-            placeholder="Bugun"
-            toDate={startOfDay(nowTashkent())}
-          />
-          {selectNeedsConfirmPin(state) && (
-            <p className="text-caption text-warning flex items-center gap-1.5">
-              <TriangleAlert className="size-3.5" aria-hidden />
-              Boshqa kunga yozish uchun PIN-kod so&rsquo;raladi
-            </p>
-          )}
-        </div>
+        <OrderDateField />
       </div>
     </div>
   );
@@ -186,7 +178,7 @@ function SelectedClientCard({
   client,
   onClear,
 }: {
-  client: NonNullable<ReturnType<typeof useNewOrderStore.getState>["client"]>;
+  client: NonNullable<NewOrderState["client"]>;
   onClear: () => void;
 }) {
   return (

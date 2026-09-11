@@ -260,7 +260,64 @@ opens the whole history again. A dashboard drill-down still wins — those links
 arrive with the period they were filtered by. The period picker gained
 **Bugun** and **Kecha** as its first presets.
 
-## 10. Measured
+## 10. What the port had lost
+
+The Flutter app was re-read screen by screen against this one — every
+repository method, every page, every dialog. Five things had not made it across,
+and all five are back.
+
+**Editing an order was a trip to "Yangi buyurtma".** It is a window of its own
+again (`OrderEditDialog`), opened over the list the desk was looking at, closing
+back onto it with the filters and scroll position intact. Three things that were
+wrong with the old route are fixed with it:
+
+- the edit ran on the app-wide order store, so opening one **took over the
+  half-typed new order** waiting on the other page — and saving it wiped that
+  order for good. Each form now owns its store (`createNewOrderStore`), and the
+  edit's has draft storage switched off: an abandoned edit leaves nothing behind.
+- the catalogue lives **inside** the window, so adding a product to an existing
+  order no longer means leaving it.
+- closing asks first, and a past-day order asks for the PIN — before the save
+  from `selectNeedsConfirmPin`, and again if the SERVER counts the day
+  differently (`pin_required`), which is the case at midnight and the one the
+  app cannot judge for itself. The identical request then goes back out with the
+  code.
+
+**The date field read as today on every edit.** Flutter's `order_date_field`
+had not been ported as such — the Next field showed the raw `orderDate`, which an
+edit deliberately leaves empty, so every order ever opened for editing looked
+like it belonged to today. It now opens on the order's own day, and two rules
+from the Flutter original came with it: picking another day **keeps the time of
+day** (the calendar hands back midnight; a sale rung up at 16:40 would have
+jumped to 00:00 and landed at the top of that day's list), and leaving the field
+alone sends no `created_at` at all, so an untouched edit keeps the exact
+timestamp the server already has. The field also carries "Asl sanaga qaytarish",
+the amber backdate styling, and the order's original moment printed underneath.
+
+**The loyalty gift had no UI at all.** The store carried `giftProduct`, the
+preview and the save both sent it — but nothing on screen could pick it. The
+"Sovg'a (ixtiyoriy)" card is back, shown only for a client the backend says has
+earned one, and skippable.
+
+**A recorded service could not be corrected.** `PATCH treatments/{id}/` and its
+DELETE were implemented and unreachable. "Tahrirlash" now opens the service's
+description, amount, doctor and day; "O'chirish" removes a record that should
+never have existed, audited by reason and gated by the PIN. Both ask for the PIN
+whenever the day isn't today's, and both retry once on the server's own
+`pin_required`.
+
+**A debt could not be written off.** `POST debts/{id}/cancel/` was reachable
+from nowhere. It sits under the row's ⋯ menu — one click deeper than paying,
+because it cannot be undone — and the reason is required.
+
+**A payout, once made, could not be opened.** The week could be inspected
+day → order → product before it was cashed out, and became a single figure the
+moment it was paid — which is exactly when a doctor asks where it came from. The
+same drill-down now opens from any row of the payout history, with who paid it,
+when, and the note; the breakdown itself is one shared component, as it is in
+the Flutter app.
+
+## 11. Measured
 
 Lighthouse against the production build:
 
@@ -282,7 +339,7 @@ purpose — see §3.
 
 Login-page JS is ~280 KB gzipped; the whole app's stylesheet is 32 KB gzipped.
 
-## 11. Nothing was dropped
+## 12. Nothing was dropped
 
 Every screen, endpoint and rule from `MIGRATION_AUDIT.md` is implemented,
 including the subtle backend contracts that are easy to lose in a rewrite:

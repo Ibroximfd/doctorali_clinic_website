@@ -36,6 +36,7 @@ import {
   type Payout,
   type PayoutStatus,
 } from "../types/payout";
+import { PayoutDetailDialog } from "./payout-detail-dialog";
 import { WeekDetailDialog } from "./week-detail-dialog";
 
 const PAGE_SIZE = 20;
@@ -72,6 +73,7 @@ export function PayoutsView() {
   );
   const history = usePayoutsQuery(filter, page);
   const cancel = useCancelPayout();
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   function reset<T>(setter: (value: T) => void) {
     return (value: T) => {
@@ -281,7 +283,18 @@ export function PayoutsView() {
                       key={payout.id}
                       className={index > 0 ? "border-surface-alt border-t" : undefined}
                     >
-                      <div className="flex items-center gap-3 px-5 py-3.5">
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setDetailId(payout.id)}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter" && event.key !== " ") return;
+                          event.preventDefault();
+                          setDetailId(payout.id);
+                        }}
+                        aria-label={`${payout.doctor.fullName} to'lovini ochish`}
+                        className="hover:bg-surface-hover focus-visible:ring-ring flex cursor-pointer items-center gap-3 px-5 py-3.5 transition-colors focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none"
+                      >
                         <AppAvatar
                           name={payout.doctor.fullName}
                           imageUrl={payout.doctor.avatarUrl}
@@ -313,7 +326,10 @@ export function PayoutsView() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => setCancelling(payout)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setCancelling(payout);
+                            }}
                             aria-label="To'lovni bekor qilish"
                             className="text-text-secondary hover:text-danger shrink-0"
                           >
@@ -336,6 +352,15 @@ export function PayoutsView() {
           </AppCard>
         </>
       )}
+
+      {/* A paid week answers "where did this figure come from?" the same way
+          an unpaid one does — day → order → product. */}
+      <PayoutDetailDialog
+        payoutId={detailId}
+        open={detailId !== null}
+        onOpenChange={(open) => !open && setDetailId(null)}
+        onCancelPayout={setCancelling}
+      />
 
       <WeekDetailDialog
         doctorId={week?.doctorId ?? null}

@@ -20,6 +20,7 @@ import { cn } from "@/shared/lib/utils";
 export function DateInput({
   value,
   onChange,
+  label,
   placeholder = "Sana tanlang",
   disabled,
   id,
@@ -31,6 +32,8 @@ export function DateInput({
 }: {
   value: TashkentDate | null;
   onChange: (date: TashkentDate) => void;
+  /** Overrides the printed date — "Bugun · 11 sentabr 2026" and the like. */
+  label?: string;
   placeholder?: string;
   disabled?: boolean;
   id?: string;
@@ -60,7 +63,7 @@ export function DateInput({
           )}
         >
           <CalendarDays className="text-text-tertiary size-4" aria-hidden />
-          {value ? dayMonthYear(value) : placeholder}
+          {label ?? (value ? dayMonthYear(value) : placeholder)}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto p-0">

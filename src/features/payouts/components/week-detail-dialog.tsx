@@ -16,18 +16,13 @@ import {
 import { Label } from "@/shared/components/ui/label";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { Textarea } from "@/shared/components/ui/textarea";
-import { dayMonth, dayMonthYear, hhmm } from "@/shared/lib/format/date";
+import { dayMonth, dayMonthYear } from "@/shared/lib/format/date";
 import { money } from "@/shared/lib/format/money";
-import { percent } from "@/shared/lib/format/percent";
 import { cn } from "@/shared/lib/utils";
 
 import { usePayWeek, useWeekDetailQuery } from "../hooks/use-payouts";
-import {
-  PAYOUT_SOURCE_LABEL,
-  balanceCaption,
-  balanceExplanation,
-  balanceOf,
-} from "../types/payout";
+import { balanceCaption, balanceExplanation, balanceOf } from "../types/payout";
+import { PayoutBreakdown } from "./payout-breakdown";
 
 /**
  * One doctor-week, opened day → order → product, before it is cashed out.
@@ -107,76 +102,7 @@ export function WeekDetailDialog({
               )}
             </div>
 
-            <ul className="flex flex-col gap-3">
-              {data.days.map((day) => (
-                <li
-                  key={day.date.getTime()}
-                  className="border-border rounded-md border p-3"
-                >
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-title-sm">{dayMonthYear(day.date)}</span>
-                    <span className="text-title-sm tabular ml-auto">
-                      {money.plain(day.dayCommission)}
-                    </span>
-                  </div>
-
-                  {day.orders.map((order) => (
-                    <div
-                      key={order.orderId}
-                      className="border-surface-alt mt-2 border-t pt-2"
-                    >
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-caption text-text-secondary tabular">
-                          {order.orderNumber} · {hhmm(order.createdAt)}
-                        </span>
-                        <span className="bg-surface-alt text-label-xs text-text-tertiary rounded-full px-1.5 py-0.5">
-                          {PAYOUT_SOURCE_LABEL[order.source]}
-                        </span>
-                        <span className="text-caption tabular ml-auto">
-                          {money.plain(order.orderCommission)}
-                        </span>
-                      </div>
-                      <ul className="mt-1 flex flex-col gap-0.5">
-                        {order.items.map((item, index) => (
-                          <li
-                            key={`${order.orderId}-${index}`}
-                            className="text-caption text-text-tertiary flex items-baseline gap-2"
-                          >
-                            <span className="truncate">
-                              {item.productName} × {item.quantity}
-                            </span>
-                            <span className="tabular ml-auto shrink-0">
-                              {percent.labeled(item.commissionPercent)} ·{" "}
-                              {money.plain(item.commissionAmount)}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-
-                  {day.adjustments.map((adjustment, index) => (
-                    <div
-                      key={`adj-${index}`}
-                      className="border-surface-alt mt-2 flex items-baseline gap-2 border-t pt-2"
-                    >
-                      <span className="text-caption text-warning">
-                        {adjustment.label}
-                        {adjustment.orderNumber && ` · ${adjustment.orderNumber}`}
-                      </span>
-                      <span
-                        className={cn(
-                          "text-caption tabular ml-auto",
-                          adjustment.amount < 0 ? "text-danger" : "text-primary-dark",
-                        )}
-                      >
-                        {money.signed(adjustment.amount)}
-                      </span>
-                    </div>
-                  ))}
-                </li>
-              ))}
-            </ul>
+            <PayoutBreakdown days={data.days} />
 
             {!data.isPaid && (
               <div className="space-y-1.5">

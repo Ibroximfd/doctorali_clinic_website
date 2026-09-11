@@ -1,6 +1,8 @@
 "use client";
 
-import { create } from "zustand";
+import { createContext, useContext } from "react";
+import { useStore } from "zustand";
+import { createStore } from "zustand/vanilla";
 
 import type { ClientSearchResult } from "@/features/clients/types/client-search";
 import type { Doctor } from "@/features/doctors/types/doctor";
@@ -166,403 +168,448 @@ const INITIAL: NewOrderState = {
   saveError: null,
 };
 
-export const useNewOrderStore = create<NewOrderState & NewOrderActions>()((set, get) => {
-  /** Drops a field error the moment the desk fixes the field. */
-  function without(key: string) {
-    const errors = get().fieldErrors;
-    if (!(key in errors)) return errors;
-    const copy = { ...errors };
-    delete copy[key];
-    return copy;
-  }
+export type NewOrderStore = NewOrderState & NewOrderActions;
+export type NewOrderStoreApi = ReturnType<typeof createNewOrderStore>;
 
-  /**
-   * The two consequences every cart mutation has: a manual total the new cart
-   * can no longer carry is dropped, then the credited amount is trimmed to
-   * what is left to pay. Order matters — the debt is clamped against the
-   * total the override decides.
-   */
-  function afterCartChanged() {
-    const state = get();
+/**
+ * One order form, in isolation.
+ *
+ * This is a FACTORY, not a singleton, and that is the whole point: editing an
+ * existing order opens a second form on top of the one reception may be halfway
+ * through typing. Sharing a single store between them meant opening an edit
+ * wiped the new order that was in progress — and saving the edit wiped it
+ * again. Each form gets its own instance; only the "Yangi buyurtma" pages share
+ * one, because there the draft is deliberately the same across both screens.
+ */
+export function createNewOrderStore() {
+  return createStore<NewOrderStore>()((set, get) => {
+    /** Drops a field error the moment the desk fixes the field. */
+    function without(key: string) {
+      const errors = get().fieldErrors;
+      if (!(key in errors)) return errors;
+      const copy = { ...errors };
+      delete copy[key];
+      return copy;
+    }
 
-    // A cart that bills nothing (every line gifted) has no paid line to
-    // spread a manual total across; the backend answers
-    // `total_override_not_applicable`, so the override is dropped and said so.
-    if (state.totalOverride !== null && !canEditTotal(state)) {
+    /**
+     * The two consequences every cart mutation has: a manual total the new cart
+     * can no longer carry is dropped, then the credited amount is trimmed to
+     * what is left to pay. Order matters — the debt is clamped against the
+     * total the override decides.
+     */
+    function afterCartChanged() {
+      const state = get();
+
+      // A cart that bills nothing (every line gifted) has no paid line to
+      // spread a manual total across; the backend answers
+      // `total_override_not_applicable`, so the override is dropped and said so.
+      if (state.totalOverride !== null && !canEditTotal(state)) {
+        set({
+          totalOverride: null,
+          notice:
+            state.cart.length === 0 ? null : "Qo'lda kiritilgan jami summa bekor qilindi",
+        });
+      }
+      clampDebt();
+    }
+
+    /**
+     * Keeps the credited amount from exceeding the sale.
+     *
+     * The case this really guards is the cart *shrinking* after the debt was
+     * entered: rather than failing at save time, the amount is trimmed and the
+     * change is announced once.
+     */
+    function clampDebt() {
+      const state = get();
+      if (!state.debtEnabled) return;
+      const payable = selectPayableTotal(state);
+      if (state.debtAmount <= payable) return;
       set({
-        totalOverride: null,
-        notice:
-          state.cart.length === 0 ? null : "Qo'lda kiritilgan jami summa bekor qilindi",
+        debtAmount: payable,
+        notice: "Qarz summasi buyurtma summasiga moslashtirildi",
       });
     }
-    clampDebt();
-  }
 
-  /**
-   * Keeps the credited amount from exceeding the sale.
-   *
-   * The case this really guards is the cart *shrinking* after the debt was
-   * entered: rather than failing at save time, the amount is trimmed and the
-   * change is announced once.
-   */
-  function clampDebt() {
-    const state = get();
-    if (!state.debtEnabled) return;
-    const payable = selectPayableTotal(state);
-    if (state.debtAmount <= payable) return;
-    set({
-      debtAmount: payable,
-      notice: "Qarz summasi buyurtma summasiga moslashtirildi",
-    });
-  }
+    return {
+      ...INITIAL,
 
-  return {
-    ...INITIAL,
+      hydrate() {
+        const draft = readDraft();
+        if (draft) set(fromDraftJson(draft));
+      },
 
-    hydrate() {
-      const draft = readDraft();
-      if (draft) set(fromDraftJson(draft));
-    },
+      reset() {
+        clearDraft();
+        set({ ...INITIAL });
+      },
 
-    reset() {
-      clearDraft();
-      set({ ...INITIAL });
-    },
-
-    setOrderType(type) {
-      if (type === get().orderType) return;
-      set({
-        orderType: type,
-        // A delivery can't carry the loyalty gift, so drop any choice made
-        // while the form was in clinic mode. The guest name/phone are
-        // deliberately KEPT when switching back and forth — reception often
-        // hesitates between the two, and losing typed text is the annoying
-        // part.
-        giftProduct: allowsGift(type) ? get().giftProduct : null,
-        fieldErrors: {},
-      });
-    },
-
-    setBuyerType(type) {
-      // A staff purchase needs no doctor, so drop any pending doctor error.
-      set({
-        buyerType: type,
-        fieldErrors: type === "staff" ? without("doctor_id") : get().fieldErrors,
-      });
-    },
-
-    selectClient(client) {
-      set({
-        client,
-        // Selecting a different client may invalidate the gift choice.
-        giftProduct: client?.giftStatus?.giftAvailable ? get().giftProduct : null,
-        fieldErrors: without("client_phone"),
-      });
-    },
-
-    setGuestName(name) {
-      set({ guestName: name, fieldErrors: without("client_name") });
-    },
-
-    setGuestPhone(phone) {
-      // Store the API form (digits only). Deliberately no lookup: a delivery
-      // client need not exist in the base, so there is no search and no
-      // spinner.
-      const digits = phone.replace(/\D/g, "");
-      const normalised = digits.startsWith("998")
-        ? digits
-        : digits === ""
-          ? ""
-          : `998${digits}`;
-      set({
-        guestPhone: normalised.slice(0, 12),
-        fieldErrors: without("client_phone"),
-      });
-    },
-
-    setDoctor(doctor) {
-      set({ doctor, fieldErrors: without("doctor_id") });
-    },
-
-    attachAppointment(id) {
-      set({ appointmentId: id });
-    },
-
-    addProduct(product, units) {
-      // Nothing on the shelf — the backend would reject the order, so the
-      // cart never gets into that state in the first place.
-      const blocked = unsellableReason(product);
-      if (blocked) {
-        set({ notice: blocked });
-        return;
-      }
-
-      const cart = [...get().cart];
-      const index = cart.findIndex((item) => item.product.id === product.id);
-      const current = index >= 0 ? cart[index].quantity : 0;
-      const requested = current + (units ?? saleStep(product));
-      const allowed = allowedQuantity(product, requested);
-
-      if (allowed <= current) {
-        set({ notice: stockLimitNotice(product) });
-        return;
-      }
-
-      if (index >= 0) cart[index] = { ...cart[index], quantity: allowed };
-      else cart.push(newCartItem(product, allowed));
-
-      set({
-        cart,
-        fieldErrors: without("items"),
-        notice: allowed < requested ? stockLimitNotice(product) : null,
-      });
-      afterCartChanged();
-    },
-
-    setQuantity(productId, quantity) {
-      if (quantity <= 0) {
-        get().removeProduct(productId);
-        return;
-      }
-      const item = get().cart.find((i) => i.product.id === productId);
-      if (!item) return;
-
-      // Clamped to what is on the shelf and snapped to whole sale steps, so
-      // the stepper can never exceed the balance and a package-only line can
-      // never hold a partial box.
-      const allowed = allowedQuantity(item.product, quantity);
-      if (allowed <= 0) {
-        get().removeProduct(productId);
-        set({ notice: stockLimitNotice(item.product) });
-        return;
-      }
-
-      set({
-        cart: get().cart.map((line) =>
-          line.product.id === productId
-            ? {
-                ...line,
-                quantity: allowed,
-                // Never let the gift count exceed the (possibly lowered)
-                // quantity either.
-                giftQuantity: allowedGift(line.product, line.giftQuantity, allowed),
-              }
-            : line,
-        ),
-        notice: allowed < quantity ? stockLimitNotice(item.product) : null,
-      });
-      afterCartChanged();
-    },
-
-    removeProduct(productId) {
-      set({ cart: get().cart.filter((i) => i.product.id !== productId) });
-      afterCartChanged();
-    },
-
-    setLinePrice(productId, input) {
-      set({
-        cart: get().cart.map((item) => {
-          if (item.product.id !== productId) return item;
-          // A price at/above the catalog price means "no discount": drop the
-          // override so the line bills at the normal price again. Below zero
-          // is coerced away too.
-          const drop =
-            input.unitPrice === null ||
-            input.unitPrice >= item.product.priceUzs ||
-            input.unitPrice <= 0;
-          return drop
-            ? { ...item, customPrice: null, customLineTotal: null }
-            : {
-                ...item,
-                customPrice: input.unitPrice,
-                customLineTotal: input.lineTotal ?? null,
-              };
-        }),
-      });
-      afterCartChanged();
-    },
-
-    setLineGift(productId, giftQuantity) {
-      set({
-        cart: get().cart.map((item) =>
-          item.product.id === productId
-            ? {
-                ...item,
-                giftQuantity: allowedGift(item.product, giftQuantity, item.quantity),
-              }
-            : item,
-        ),
-      });
-      afterCartChanged();
-    },
-
-    setTotalOverride(amount) {
-      const state = get();
-      // Clearing it, a negative value, or simply typing the sum the cart
-      // already has: all mean "no override".
-      const drop =
-        amount === null ||
-        amount < 0 ||
-        amount === selectSubtotal(state) ||
-        !canEditTotal(state);
-      set({
-        totalOverride: drop ? null : amount,
-        fieldErrors: without("total_override"),
-      });
-      clampDebt();
-    },
-
-    setGiftProduct(product) {
-      set({ giftProduct: product, fieldErrors: without("gift_product_id") });
-    },
-
-    setNote(note) {
-      set({ note });
-    },
-
-    setDebt(patch) {
-      const next = { ...get(), ...patch };
-      if (patch.debtEnabled === false) {
+      setOrderType(type) {
+        if (type === get().orderType) return;
         set({
-          debtEnabled: false,
-          debtAmount: 0,
-          debtDueDate: null,
-          debtNote: "",
+          orderType: type,
+          // A delivery can't carry the loyalty gift, so drop any choice made
+          // while the form was in clinic mode. The guest name/phone are
+          // deliberately KEPT when switching back and forth — reception often
+          // hesitates between the two, and losing typed text is the annoying
+          // part.
+          giftProduct: allowsGift(type) ? get().giftProduct : null,
+          fieldErrors: {},
+        });
+      },
+
+      setBuyerType(type) {
+        // A staff purchase needs no doctor, so drop any pending doctor error.
+        set({
+          buyerType: type,
+          fieldErrors: type === "staff" ? without("doctor_id") : get().fieldErrors,
+        });
+      },
+
+      selectClient(client) {
+        set({
+          client,
+          // Selecting a different client may invalidate the gift choice.
+          giftProduct: client?.giftStatus?.giftAvailable ? get().giftProduct : null,
+          fieldErrors: without("client_phone"),
+        });
+      },
+
+      setGuestName(name) {
+        set({ guestName: name, fieldErrors: without("client_name") });
+      },
+
+      setGuestPhone(phone) {
+        // Store the API form (digits only). Deliberately no lookup: a delivery
+        // client need not exist in the base, so there is no search and no
+        // spinner.
+        const digits = phone.replace(/\D/g, "");
+        const normalised = digits.startsWith("998")
+          ? digits
+          : digits === ""
+            ? ""
+            : `998${digits}`;
+        set({
+          guestPhone: normalised.slice(0, 12),
+          fieldErrors: without("client_phone"),
+        });
+      },
+
+      setDoctor(doctor) {
+        set({ doctor, fieldErrors: without("doctor_id") });
+      },
+
+      attachAppointment(id) {
+        set({ appointmentId: id });
+      },
+
+      addProduct(product, units) {
+        // Nothing on the shelf — the backend would reject the order, so the
+        // cart never gets into that state in the first place.
+        const blocked = unsellableReason(product);
+        if (blocked) {
+          set({ notice: blocked });
+          return;
+        }
+
+        const cart = [...get().cart];
+        const index = cart.findIndex((item) => item.product.id === product.id);
+        const current = index >= 0 ? cart[index].quantity : 0;
+        const requested = current + (units ?? saleStep(product));
+        const allowed = allowedQuantity(product, requested);
+
+        if (allowed <= current) {
+          set({ notice: stockLimitNotice(product) });
+          return;
+        }
+
+        if (index >= 0) cart[index] = { ...cart[index], quantity: allowed };
+        else cart.push(newCartItem(product, allowed));
+
+        set({
+          cart,
+          fieldErrors: without("items"),
+          notice: allowed < requested ? stockLimitNotice(product) : null,
+        });
+        afterCartChanged();
+      },
+
+      setQuantity(productId, quantity) {
+        if (quantity <= 0) {
+          get().removeProduct(productId);
+          return;
+        }
+        const item = get().cart.find((i) => i.product.id === productId);
+        if (!item) return;
+
+        // Clamped to what is on the shelf and snapped to whole sale steps, so
+        // the stepper can never exceed the balance and a package-only line can
+        // never hold a partial box.
+        const allowed = allowedQuantity(item.product, quantity);
+        if (allowed <= 0) {
+          get().removeProduct(productId);
+          set({ notice: stockLimitNotice(item.product) });
+          return;
+        }
+
+        set({
+          cart: get().cart.map((line) =>
+            line.product.id === productId
+              ? {
+                  ...line,
+                  quantity: allowed,
+                  // Never let the gift count exceed the (possibly lowered)
+                  // quantity either.
+                  giftQuantity: allowedGift(line.product, line.giftQuantity, allowed),
+                }
+              : line,
+          ),
+          notice: allowed < quantity ? stockLimitNotice(item.product) : null,
+        });
+        afterCartChanged();
+      },
+
+      removeProduct(productId) {
+        set({ cart: get().cart.filter((i) => i.product.id !== productId) });
+        afterCartChanged();
+      },
+
+      setLinePrice(productId, input) {
+        set({
+          cart: get().cart.map((item) => {
+            if (item.product.id !== productId) return item;
+            // A price at/above the catalog price means "no discount": drop the
+            // override so the line bills at the normal price again. Below zero
+            // is coerced away too.
+            const drop =
+              input.unitPrice === null ||
+              input.unitPrice >= item.product.priceUzs ||
+              input.unitPrice <= 0;
+            return drop
+              ? { ...item, customPrice: null, customLineTotal: null }
+              : {
+                  ...item,
+                  customPrice: input.unitPrice,
+                  customLineTotal: input.lineTotal ?? null,
+                };
+          }),
+        });
+        afterCartChanged();
+      },
+
+      setLineGift(productId, giftQuantity) {
+        set({
+          cart: get().cart.map((item) =>
+            item.product.id === productId
+              ? {
+                  ...item,
+                  giftQuantity: allowedGift(item.product, giftQuantity, item.quantity),
+                }
+              : item,
+          ),
+        });
+        afterCartChanged();
+      },
+
+      setTotalOverride(amount) {
+        const state = get();
+        // Clearing it, a negative value, or simply typing the sum the cart
+        // already has: all mean "no override".
+        const drop =
+          amount === null ||
+          amount < 0 ||
+          amount === selectSubtotal(state) ||
+          !canEditTotal(state);
+        set({
+          totalOverride: drop ? null : amount,
+          fieldErrors: without("total_override"),
+        });
+        clampDebt();
+      },
+
+      setGiftProduct(product) {
+        set({ giftProduct: product, fieldErrors: without("gift_product_id") });
+      },
+
+      setNote(note) {
+        set({ note });
+      },
+
+      setDebt(patch) {
+        const next = { ...get(), ...patch };
+        if (patch.debtEnabled === false) {
+          set({
+            debtEnabled: false,
+            debtAmount: 0,
+            debtDueDate: null,
+            debtNote: "",
+            fieldErrors: without("debt"),
+          });
+          return;
+        }
+        set({
+          debtEnabled: next.debtEnabled,
+          debtAmount: Math.max(0, next.debtAmount),
+          debtDueDate: next.debtDueDate,
+          debtNote: next.debtNote,
           fieldErrors: without("debt"),
         });
-        return;
-      }
-      set({
-        debtEnabled: next.debtEnabled,
-        debtAmount: Math.max(0, next.debtAmount),
-        debtDueDate: next.debtDueDate,
-        debtNote: next.debtNote,
-        fieldErrors: without("debt"),
-      });
-      clampDebt();
-    },
+        clampDebt();
+      },
 
-    setPaymentType(type) {
-      // A tap is a deliberate marking: it is what lets an order that takes no
-      // money now (full credit, full gift) still be booked as cash or card
-      // instead of "To'lanmagan".
-      set({
-        paymentType: type,
-        paymentTypeMarked: true,
-        fieldErrors: without("payment_type"),
-      });
-    },
+      setPaymentType(type) {
+        // A tap is a deliberate marking: it is what lets an order that takes no
+        // money now (full credit, full gift) still be booked as cash or card
+        // instead of "To'lanmagan".
+        set({
+          paymentType: type,
+          paymentTypeMarked: true,
+          fieldErrors: without("payment_type"),
+        });
+      },
 
-    unmarkPayment() {
-      // The chosen type is kept, not wiped: reception often lowers the debt
-      // again right after, and the chip they picked should still be there.
-      set({ paymentTypeMarked: false, fieldErrors: without("payment_type") });
-    },
+      unmarkPayment() {
+        // The chosen type is kept, not wiped: reception often lowers the debt
+        // again right after, and the chip they picked should still be there.
+        set({ paymentTypeMarked: false, fieldErrors: without("payment_type") });
+      },
 
-    setSplitPayment(enabled) {
-      set({ splitPayment: enabled, fieldErrors: without("payment_type") });
-    },
+      setSplitPayment(enabled) {
+        set({ splitPayment: enabled, fieldErrors: without("payment_type") });
+      },
 
-    setSplitAmount(type, amount) {
-      const next = { ...get().splitAmounts };
-      if (amount <= 0) delete next[type];
-      else next[type] = amount;
-      set({ splitAmounts: next });
-    },
+      setSplitAmount(type, amount) {
+        const next = { ...get().splitAmounts };
+        if (amount <= 0) delete next[type];
+        else next[type] = amount;
+        set({ splitAmounts: next });
+      },
 
-    setOrderDate(date) {
-      set({ orderDate: date });
-    },
+      setOrderDate(date) {
+        set({ orderDate: date });
+      },
 
-    startEditing(order, items, doctor) {
-      set({
-        ...INITIAL,
-        editingOrder: order,
-        cart: items,
-        // A total that was typed by hand stays typed by hand: re-sending it
-        // keeps the money exactly as booked, down to each line's rounding.
-        totalOverride:
-          order.originalTotal !== null && order.originalTotal !== order.totalAmount
-            ? order.totalAmount
-            : null,
-        doctor,
-        orderType: order.orderType,
-        buyerType: order.buyerType,
-        paymentType: order.paymentType,
-        // An order the backend reports as "none" was never marked; anything
-        // else carries a type the desk chose and must keep on re-save.
-        paymentTypeMarked: !order.isUnpaidOrder,
-        splitPayment: order.isMixedPayment && order.payments.length > 1,
-        splitAmounts: order.isMixedPayment
-          ? Object.fromEntries(
-              order.payments.filter((p) => p.amount > 0).map((p) => [p.type, p.amount]),
-            )
-          : {},
-        note: order.note ?? "",
-        debtEnabled: order.debt !== null,
-        debtAmount: order.debt?.amount ?? 0,
-        debtDueDate: order.debt?.dueDate ?? null,
-        debtNote: order.debt?.note ?? "",
-        appointmentId: order.appointmentId,
-        guestPhone: order.clientPhone,
-        guestName: order.clientName,
-      });
-    },
+      startEditing(order, items, doctor) {
+        set({
+          ...INITIAL,
+          editingOrder: order,
+          cart: items,
+          // A total that was typed by hand stays typed by hand: re-sending it
+          // keeps the money exactly as booked, down to each line's rounding.
+          totalOverride:
+            order.originalTotal !== null && order.originalTotal !== order.totalAmount
+              ? order.totalAmount
+              : null,
+          doctor,
+          orderType: order.orderType,
+          buyerType: order.buyerType,
+          paymentType: order.paymentType,
+          // An order the backend reports as "none" was never marked; anything
+          // else carries a type the desk chose and must keep on re-save.
+          paymentTypeMarked: !order.isUnpaidOrder,
+          splitPayment: order.isMixedPayment && order.payments.length > 1,
+          splitAmounts: order.isMixedPayment
+            ? Object.fromEntries(
+                order.payments.filter((p) => p.amount > 0).map((p) => [p.type, p.amount]),
+              )
+            : {},
+          note: order.note ?? "",
+          debtEnabled: order.debt !== null,
+          debtAmount: order.debt?.amount ?? 0,
+          debtDueDate: order.debt?.dueDate ?? null,
+          debtNote: order.debt?.note ?? "",
+          appointmentId: order.appointmentId,
+          guestPhone: order.clientPhone,
+          guestName: order.clientName,
+        });
+      },
 
-    setPreview(preview, failed = false) {
-      set({ preview, previewFailed: failed });
-      // The server may price the basket lower than the debt reception typed
-      // (a gift it knows about, a rule the app doesn't), so re-check.
-      clampDebt();
-    },
+      setPreview(preview, failed = false) {
+        set({ preview, previewFailed: failed });
+        // The server may price the basket lower than the debt reception typed
+        // (a gift it knows about, a rule the app doesn't), so re-check.
+        clampDebt();
+      },
 
-    setShowValidation(show) {
-      set({ showValidation: show });
-    },
+      setShowValidation(show) {
+        set({ showValidation: show });
+      },
 
-    clearNotice() {
-      set({ notice: null });
-    },
+      clearNotice() {
+        set({ notice: null });
+      },
 
-    setFieldErrors(errors) {
-      set({ fieldErrors: errors });
-    },
+      setFieldErrors(errors) {
+        set({ fieldErrors: errors });
+      },
 
-    setSaveError(message) {
-      set({ saveError: message });
-    },
+      setSaveError(message) {
+        set({ saveError: message });
+      },
 
-    applyStockIssues(issues) {
-      if (issues.length === 0) return;
-      const byId = new Map(issues.map((issue) => [String(issue.productId), issue]));
+      applyStockIssues(issues) {
+        if (issues.length === 0) return;
+        const byId = new Map(issues.map((issue) => [String(issue.productId), issue]));
 
-      set({
-        cart: get().cart.map((item) => {
-          const issue = byId.get(item.product.id);
-          if (!issue) return item;
+        set({
+          cart: get().cart.map((item) => {
+            const issue = byId.get(item.product.id);
+            if (!issue) return item;
 
-          const product: Product = {
-            ...item.product,
-            stockQuantity: issue.available,
-            trackStock: true,
-          };
-          const allowed = allowedQuantity(product, item.quantity);
-          // Nothing sellable left (or less than one whole box): keep the line
-          // as it is — visibly wrong next to the error text — rather than
-          // silently deleting what reception just tried to sell.
-          const quantity = allowed > 0 ? allowed : item.quantity;
-          return {
-            ...item,
-            product,
-            quantity,
-            giftQuantity: allowedGift(product, item.giftQuantity, quantity),
-          };
-        }),
-      });
-      clampDebt();
-    },
-  };
-});
+            const product: Product = {
+              ...item.product,
+              stockQuantity: issue.available,
+              trackStock: true,
+            };
+            const allowed = allowedQuantity(product, item.quantity);
+            // Nothing sellable left (or less than one whole box): keep the line
+            // as it is — visibly wrong next to the error text — rather than
+            // silently deleting what reception just tried to sell.
+            const quantity = allowed > 0 ? allowed : item.quantity;
+            return {
+              ...item,
+              product,
+              quantity,
+              giftQuantity: allowedGift(product, item.giftQuantity, quantity),
+            };
+          }),
+        });
+        clampDebt();
+      },
+    };
+  });
+}
+
+/**
+ * The store the "Yangi buyurtma" pages share.
+ *
+ * App-scoped on purpose: the order page and the catalogue page are two routes
+ * building ONE basket, and the draft has to survive the navigation between them
+ * and a browser reload.
+ */
+export const appNewOrderStore = createNewOrderStore();
+
+const NewOrderStoreContext = createContext<NewOrderStoreApi>(appNewOrderStore);
+
+/** Puts a form's own store in scope — the edit dialog wraps itself in this. */
+export const NewOrderStoreProvider = NewOrderStoreContext.Provider;
+
+/** The store instance this subtree belongs to, for subscriptions and reads. */
+export function useNewOrderStoreApi(): NewOrderStoreApi {
+  return useContext(NewOrderStoreContext);
+}
+
+const identity = (state: NewOrderStore) => state;
+
+export function useNewOrderStore(): NewOrderStore;
+export function useNewOrderStore<T>(selector: (state: NewOrderStore) => T): T;
+export function useNewOrderStore<T>(selector?: (state: NewOrderStore) => T) {
+  return useStore(
+    useContext(NewOrderStoreContext),
+    (selector ?? identity) as (state: NewOrderStore) => T,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Draft persistence
@@ -692,8 +739,8 @@ let pending: ReturnType<typeof setTimeout> | null = null;
  * Mirrors the form into storage as it changes, collapsing a burst of keystrokes
  * into one trailing write.
  */
-export function startDraftPersistence(): () => void {
-  return useNewOrderStore.subscribe((state) => {
+export function startDraftPersistence(store: NewOrderStoreApi): () => void {
+  return store.subscribe((state) => {
     // An order being edited is already on the server; a draft of it would only
     // resurrect a half-finished edit on the next reload.
     if (state.editingOrder !== null) return;
@@ -701,7 +748,7 @@ export function startDraftPersistence(): () => void {
     const write = () => {
       lastWrite = Date.now();
       pending = null;
-      const current = useNewOrderStore.getState();
+      const current = store.getState();
       if (hasDraftContent(current)) saveDraft(toDraftJson(current));
       else clearDraft();
     };

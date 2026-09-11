@@ -118,6 +118,26 @@ export function startOfDay(d: Date): TashkentDate {
   ) as TashkentDate;
 }
 
+/**
+ * The calendar day of `day` carrying the time of day of `time`.
+ *
+ * Moving a record to another date must not move its clock: an order that reads
+ * 00:00 among the day's other sales looks like a glitch, and an edited order
+ * must keep the minute it was actually rung up at.
+ */
+export function withTimeOfDay(day: Date, time: Date): TashkentDate {
+  return new Date(
+    Date.UTC(
+      day.getUTCFullYear(),
+      day.getUTCMonth(),
+      day.getUTCDate(),
+      time.getUTCHours(),
+      time.getUTCMinutes(),
+      time.getUTCSeconds(),
+    ),
+  ) as TashkentDate;
+}
+
 /** Adds whole days without tripping over a DST rule that does not exist here. */
 export function addDays(d: Date, days: number): TashkentDate {
   return new Date(d.getTime() + days * 86_400_000) as TashkentDate;

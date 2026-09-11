@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { AppRoutes, clientDetailPath } from "@/config/routes";
-import { DoctorFilter } from "@/features/doctors/components/doctor-filter";
 import { ReceiptPrintButton } from "@/features/receipt/components/receipt-print-button";
 import { PinConfirmDialog } from "@/features/security/components/pin-confirm-dialog";
 import { usePinGate } from "@/features/security/hooks/use-pin-gate";
@@ -53,7 +52,9 @@ import {
   OrderTypeBadge,
   PaymentBadge,
 } from "./order-badges";
-import { useStartOrderEdit } from "@/features/new-order/hooks/use-start-order-edit";
+import { OrderEditDialog } from "@/features/new-order/components/order-edit-dialog";
+import { DoctorFilter } from "@/features/doctors/components/doctor-filter";
+import { useDoctorById } from "@/features/doctors/hooks/use-doctors";
 
 import { OrderDetailDialog } from "./order-detail-dialog";
 import {
@@ -106,13 +107,15 @@ export function OrdersView() {
   const [page, setPage] = useState(urlFilter.page);
 
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<OrderDetail | null>(null);
   const [cancelling, setCancelling] = useState<OrderDetail | null>(null);
   const [deleting, setDeleting] = useState<OrderDetail | null>(null);
 
   const debouncedSearch = useDebouncedValue(search);
+  // Named on the active-filter chip, so a list narrowed to one doctor says so.
+  const doctor = useDoctorById(doctorId);
   const pinGate = usePinGate();
   const cancel = useCancelOrder();
-  const edit = useStartOrderEdit();
   const remove = useDeleteOrder();
 
   const filter = useMemo<OrderFilter>(
@@ -214,7 +217,9 @@ export function OrdersView() {
       ? [
           {
             id: "doctor",
-            label: "Shifokor tanlangan",
+            // The name, not "a doctor is selected": a chip that doesn't say
+            // WHICH doctor sends the desk back to the dropdown to find out.
+            label: doctor?.fullName ?? "Shifokor tanlangan",
             onClear: () => reset(setDoctorId)(null),
           },
         ]
@@ -363,7 +368,7 @@ export function OrdersView() {
         onOpenChange={(open) => !open && setDetailId(null)}
         onEdit={(order) => {
           setDetailId(null);
-          void edit.start(order);
+          setEditing(order);
         }}
         onCancel={(order) => {
           setDetailId(null);
@@ -373,6 +378,14 @@ export function OrdersView() {
           setDetailId(null);
           setDeleting(order);
         }}
+      />
+
+      {/* The edit opens over the list, so closing it lands back on exactly
+          the page and filters the desk was looking at. */}
+      <OrderEditDialog
+        order={editing}
+        open={editing !== null}
+        onOpenChange={(open) => !open && setEditing(null)}
       />
 
       <ReasonDialog

@@ -3,7 +3,11 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
 
-import { startDraftPersistence, useNewOrderStore } from "../store/new-order-store";
+import {
+  startDraftPersistence,
+  useNewOrderStore,
+  useNewOrderStoreApi,
+} from "../store/new-order-store";
 import { useOrderPreview } from "./use-order-preview";
 
 /**
@@ -20,20 +24,30 @@ import { useOrderPreview } from "./use-order-preview";
  * catalogue adding the lines up itself — which bills nine pieces at nine unit
  * prices, while the server bills the box price. Two screens, one figure.
  */
-export function useNewOrderSession(): {
+export function useNewOrderSession(options?: {
+  /**
+   * Whether this form is the app's draft. False for the edit dialog: its order
+   * already exists on the server, so it must neither restore the desk's
+   * half-typed new order into itself nor overwrite it on the way out.
+   */
+  readonly persistDraft?: boolean;
+}): {
   /** The server is pricing a basket it hasn't priced before. */
   readonly previewPending: boolean;
   /** The pricing call failed — the figures on screen are the local estimate. */
   readonly previewFailed: boolean;
 } {
+  const persistDraft = options?.persistDraft ?? true;
+  const store = useNewOrderStoreApi();
   const hydrate = useNewOrderStore((s) => s.hydrate);
   const notice = useNewOrderStore((s) => s.notice);
   const clearNotice = useNewOrderStore((s) => s.clearNotice);
 
   useEffect(() => {
+    if (!persistDraft) return;
     hydrate();
-    return startDraftPersistence();
-  }, [hydrate]);
+    return startDraftPersistence(store);
+  }, [hydrate, store, persistDraft]);
 
   // One-shot notices ("Omborda faqat 2 dona") are events, not state.
   useEffect(() => {

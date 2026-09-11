@@ -3,38 +3,26 @@
 import { PackagePlus, Plus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { toast } from "sonner";
 
-import { createOrder, updateOrder } from "@/features/orders/api/orders-api";
-import { useInvalidateOrders } from "@/features/orders/hooks/use-orders";
 import type { CreateOrderResult } from "@/features/orders/types/order";
 import { percentFor } from "@/features/doctors/types/doctor";
 import { useReceiptPrint } from "@/features/receipt/hooks/use-receipt-print";
 import { PinConfirmDialog } from "@/features/security/components/pin-confirm-dialog";
-import { usePinGate } from "@/features/security/hooks/use-pin-gate";
-import { splitPayments } from "@/shared/components/form/payment-split-editor";
-import { toDebtDraft } from "@/shared/components/form/debt-editor";
 import { AppRoutes } from "@/config/routes";
 import { PageContainer } from "@/shared/components/data-display/page-container";
 import { Button } from "@/shared/components/ui/button";
-import { ApiError } from "@/shared/lib/api/errors";
-import { uuidV4 } from "@/shared/lib/uuid";
 
 import {
   canEditTotal,
-  selectEffectivePaymentType,
-  selectGiftEligible,
-  selectIsDelivery,
-  selectIsValid,
-  selectNeedsConfirmPin,
   selectPayableTotal,
-  selectSubmitBlocker,
   selectSubtotal,
   useNewOrderStore,
 } from "../store/new-order-store";
 import { useNewOrderSession } from "../hooks/use-new-order-session";
+import { useOrderSubmit } from "../hooks/use-order-submit";
 import { OrderCartPanel } from "./order-cart-panel";
 import { OrderClientSection } from "./order-client-section";
+import { OrderGiftSection } from "./order-gift-section";
 import { OrderSummaryPanel } from "./order-summary-panel";
 import { OrderSuccessOverlay } from "./order-success-overlay";
 import { TotalOverrideDialog } from "./total-override-dialog";
@@ -59,24 +47,21 @@ export function NewOrderView() {
   const preview = useNewOrderSession();
 
   const state = useNewOrderStore();
-  const {
-    cart,
-    setTotalOverride,
-    reset,
-    setShowValidation,
-    setFieldErrors,
-    setSaveError,
-    applyStockIssues,
-  } = state;
+  const { cart, setTotalOverride, reset } = state;
 
   const [totalDialogOpen, setTotalDialogOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<CreateOrderResult | null>(null);
-  const [idempotencyKey, setIdempotencyKey] = useState(() => uuidV4());
 
-  const pinGate = usePinGate();
-  const invalidateOrders = useInvalidateOrders();
   const { print, isPrinting } = useReceiptPrint();
+  const { submit, submitting, pinGate, renewIdempotencyKey } = useOrderSubmit({
+    onSaved(saved) {
+      setResult(saved);
+      // The order exists on the server now: drop the draft immediately rather
+      // than at the reset, so a reload during the success screen can never
+      // bring the cart back and invite a duplicate.
+      reset();
+    },
+  });
 
   const commissionPercent = state.doctor?.commissionPercent ?? null;
   const commissionAmount =
@@ -84,83 +69,6 @@ export function NewOrderView() {
     (state.doctor && commissionPercent !== null
       ? Math.round((selectPayableTotal(state) * commissionPercent) / 100)
       : null);
-
-  async function save(confirmPin?: string) {
-    setSubmitting(true);
-    setSaveError(null);
-    try {
-      const draft = {
-        orderType: state.orderType,
-        clientPhone: selectIsDelivery(state)
-          ? state.guestPhone
-          : (state.client?.phone ?? ""),
-        clientName: selectIsDelivery(state) ? state.guestName.trim() : null,
-        doctor: state.doctor,
-        items: state.cart,
-        paymentType: selectEffectivePaymentType(state),
-        payments: state.splitPayment ? splitPayments(state.splitAmounts) : null,
-        buyerType: state.buyerType,
-        note: state.note,
-        giftProduct: selectGiftEligible(state) ? state.giftProduct : null,
-        debt: toDebtDraft({
-          enabled: state.debtEnabled,
-          amount: state.debtAmount,
-          dueDate: state.debtDueDate,
-          note: state.debtNote,
-        }),
-        appointmentId: state.appointmentId,
-        totalOverride: state.totalOverride,
-        createdAt: state.orderDate,
-        confirmPin: confirmPin ?? null,
-        idempotencyKey,
-      };
-
-      const payable = selectPayableTotal(state);
-      const editing = state.editingOrder;
-      const saved = editing
-        ? await updateOrder(editing.id, draft, payable)
-        : await createOrder(draft, payable);
-
-      invalidateOrders();
-      setResult(saved);
-      // The order exists on the server now: drop the draft immediately rather
-      // than at the reset, so a reload during the success screen can never
-      // bring the cart back and invite a duplicate.
-      reset();
-      // The receipt goes out on its own — saving never waits on the printer.
-      print(saved.order.id, saved.receipt);
-    } catch (error) {
-      if (ApiError.is(error)) {
-        setFieldErrors(error.fieldErrors);
-        // `insufficient_stock` carries the real balances (the race two tills
-        // lose to each other) — fold them back into the cart so the lines
-        // correct themselves instead of failing again on resubmit.
-        applyStockIssues(error.stockIssues);
-        // Both: the toast catches the eye, the panel keeps the server's reason
-        // on screen while the desk fixes what it names.
-        setSaveError(error.message);
-        toast.error(error.message);
-      } else {
-        const message = "Kutilmagan xatolik yuz berdi. Qayta urinib ko'ring.";
-        setSaveError(message);
-        toast.error(message);
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  function handleSubmit() {
-    setShowValidation(true);
-    if (!selectIsValid(state)) {
-      // Never stop silently: the blocking field is often out of view, so a bare
-      // return reads as a dead button.
-      toast.error(selectSubmitBlocker(state) ?? "Formani to'ldiring");
-      return;
-    }
-    if (selectNeedsConfirmPin(state)) pinGate.requestPin((pin) => void save(pin));
-    else void save();
-  }
 
   if (result) {
     return (
@@ -172,7 +80,7 @@ export function NewOrderView() {
             onPrint={() => print(result.order.id, result.receipt)}
             onNewOrder={() => {
               setResult(null);
-              setIdempotencyKey(uuidV4());
+              renewIdempotencyKey();
             }}
           />
         </div>
@@ -192,6 +100,8 @@ export function NewOrderView() {
       <PageContainer className="flex flex-col gap-4 xl:h-full xl:flex-row xl:overflow-hidden">
         <div className="flex min-w-0 flex-1 flex-col gap-4 xl:overflow-y-auto xl:pr-1">
           <OrderClientSection />
+
+          <OrderGiftSection />
 
           <OrderCartPanel
             emptyMessage="Mahsulot tanlash sahifasida kartochkani bosing — u shu yerga tushadi."
@@ -217,7 +127,7 @@ export function NewOrderView() {
         <div className="w-full shrink-0 xl:w-[400px] xl:overflow-y-auto">
           <OrderSummaryPanel
             onEditTotal={() => canEditTotal(state) && setTotalDialogOpen(true)}
-            onSubmit={handleSubmit}
+            onSubmit={submit}
             onReset={reset}
             submitting={submitting}
             previewPending={preview.previewPending}
