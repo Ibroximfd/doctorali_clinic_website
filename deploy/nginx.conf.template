@@ -1,0 +1,157 @@
+# ==============================================================================
+# Doctor Ali — Qabulxona · nginx shabloni
+#
+# Bu fayl to'g'ridan-to'g'ri ishlatilmaydi: `deploy/nginx-setup.sh` uni
+# `config/servers.mjs` dagi qiymatlar bilan to'ldirib,
+# `/etc/nginx/conf.d/qabulxona-<muhit>.conf` ga yozadi. Almashtiriladigan
+# qiymatlar: ${PANEL_HOST}, ${APP_PORT}, ${ENV_NAME}, ${API_UPSTREAM}.
+# Qolgan $-belgilar nginx'ning o'z o'zgaruvchilari.
+#
+# Panel `next start` bilan ishlaydi (SSR qobiq + klient tomonda ma'lumot), demak
+# nginx bu yerda statik server emas, teskari proksi. Node jarayoni qilmasligi
+# kerak bo'lgan ikki ish:
+#
+#   • /_next/static ni o'zgarmas kesh sifatida beradi — fayl nomlari kontent
+#     hash'idan iborat, shuning uchun bir yil ham ko'p emas;
+#   • /api ni backendga SHU ORIGIN ostida uzatadi, shunda brauzer umuman CORS
+#     ko'rmaydi va backend panel qaysi mashinadan ochilganini bilishi shart emas.
+# ==============================================================================
+
+upstream qabulxona_app_${ENV_NAME} {
+    server 127.0.0.1:${APP_PORT};
+    keepalive 32;
+}
+
+# Backend nginx'ning upstream'i, shuning uchun `host:port` — sxemasiz.
+upstream qabulxona_api_${ENV_NAME} {
+    server ${API_UPSTREAM};
+    keepalive 32;
+}
+
+# Kichraytirilgan mahsulot rasmlari va avatarlar chekkada keshlanadi.
+# Originallar ko'p megabaytli yuklamalar, Next ularni birinchi so'rovda siqadi;
+# natijani shu yerda saqlash o'sha birinchi so'rov server uchun bir marta
+# to'lanishini anglatadi — har Node restartida emas, va deploy ketayotganda
+# umuman emas.
+proxy_cache_path /var/cache/nginx/qabulxona_${ENV_NAME}_images levels=1:2
+                 keys_zone=qabulxona_${ENV_NAME}_images:10m max_size=2g inactive=30d
+                 use_temp_path=off;
+
+server {
+    listen 80;
+    server_name ${PANEL_HOST};
+
+    # Qolgan hamma narsa HTTPS; certbot o'z challenge'ini shu yerga yozadi.
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${PANEL_HOST};
+
+    ssl_certificate     /etc/letsencrypt/live/${PANEL_HOST}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${PANEL_HOST}/privkey.pem;
+
+    # Chek yoki mijozlar importi bundan ancha kichik; adashgan katta yuklama
+    # ilovaning yarmiga yetib emas, chekkada tugashi kerak.
+    client_max_body_size 20m;
+
+    # Panelda mijoz yozuvlari turadi — indekslash yo'q, frame yo'q, sniffing yo'q.
+    add_header X-Robots-Tag "noindex, nofollow" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript
+               application/x-javascript text/xml application/xml image/svg+xml;
+    gzip_min_length 1024;
+
+    # --- O'zgarmas build natijasi ---------------------------------------------
+    # Fayl nomlari kontent hash'i: yangi build yangi nom beradi, shuning uchun bu
+    # yerdagi hech narsa qayta tekshirilmaydi.
+    location /_next/static/ {
+        proxy_pass http://qabulxona_app_${ENV_NAME};
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # Optimallashtirilgan rasmlar query string bilan manzillanadi — unda manba
+    # URL ham, kenglik ham bor.
+    location /_next/image {
+        proxy_pass http://qabulxona_app_${ENV_NAME};
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+
+        proxy_cache            qabulxona_${ENV_NAME}_images;
+        proxy_cache_key        $uri$is_args$args;
+        proxy_cache_valid      200 30d;
+        # Ilova qayta ko'tarilayotganda eski thumbnail siniqdan yaxshi.
+        proxy_cache_use_stale  error timeout updating http_500 http_502 http_503;
+        proxy_cache_lock       on;
+        add_header X-Cache-Status $upstream_cache_status;
+        add_header Cache-Control "public, max-age=2592000";
+    }
+
+    location ~* ^/(favicon\.png|manifest\.webmanifest|icons/) {
+        proxy_pass http://qabulxona_app_${ENV_NAME};
+        add_header Cache-Control "public, max-age=86400";
+    }
+
+    # --- Backend ---------------------------------------------------------------
+    # Panel bilan bir xil origin, shuning uchun brauzer hech qachon cross-origin
+    # so'rov qilmaydi va backendga bu host uchun CORS siyosati kerak emas.
+    #
+    # Django panel bilan bir domenda tursa, uning o'z yo'llari ham shu yerdan
+    # o'tadi: `/admin/` va `/static/` bloklarini shuning uchun qoldirdik. Panel
+    # alohida subdomenda bo'lsa, ularni olib tashlang.
+    location ~ ^/(api|admin)/ {
+        proxy_pass http://qabulxona_api_${ENV_NAME};
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection        "";
+
+        # Bir yillik buyurtmalarning Excel eksporti o'z vaqtini oladi.
+        proxy_read_timeout 120s;
+
+        # Pul hech qachon keshdan javob bermasligi kerak.
+        proxy_no_cache 1;
+        proxy_cache_bypass 1;
+        add_header Cache-Control "no-store" always;
+    }
+
+    # Django'ning o'z statikasi va yuklangan fayllari.
+    location ~ ^/(static|media)/ {
+        proxy_pass http://qabulxona_api_${ENV_NAME};
+        proxy_http_version 1.1;
+        proxy_set_header Host       $host;
+        proxy_set_header Connection "";
+        add_header Cache-Control "public, max-age=86400";
+    }
+
+    # --- Ilova -----------------------------------------------------------------
+    location / {
+        proxy_pass http://qabulxona_app_${ENV_NAME};
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade           $http_upgrade;
+        proxy_set_header Connection        "upgrade";
+
+        # HTML sessiyaga bog'liq: unda auth redirect qarori bor.
+        add_header Cache-Control "no-store" always;
+    }
+}

@@ -9,10 +9,10 @@
 # it actually imports, which is what makes the final image ~180 MB instead of
 # ~1.2 GB.
 #
-#   docker build -t doctor-ali-qabulxona \
-#     --build-arg NEXT_PUBLIC_MEDIA_ORIGIN=https://my.imorganic.uz .
-#   docker run -p 3000:3000 \
-#     -e API_PROXY_TARGET=https://my.imorganic.uz doctor-ali-qabulxona
+#   docker build -t doctor-ali-qabulxona --build-arg APP_SERVER=prod .
+#   docker run -p 3000:3000 -e APP_SERVER=prod doctor-ali-qabulxona
+#
+# Odatda qo'lda emas — `./deploy/deploy.sh prod`.
 # ==============================================================================
 
 # --- 1. Dependencies ----------------------------------------------------------
@@ -32,22 +32,18 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # NEXT_PUBLIC_* values are inlined at build time — they are not read from the
-# container's environment at runtime, so they must be passed in here. That is
-# Next's model.
+# container's environment at runtime. That is Next's model.
 #
-# The backend origin is deliberately NOT one of them: the browser calls
-# `/api/reception/` on this container and the server forwards it, reading
-# API_PROXY_TARGET at RUNTIME. Switching between test and production is
-# therefore an `-e` flag, not a rebuild.
+# Which backend this build belongs to is ONE argument: `next.config.ts` reads
+# `config/servers.mjs` and derives the media origin and the site URL from it.
+# The rest are overrides that a normal deploy never passes.
+ARG APP_SERVER=prod
 ARG NEXT_PUBLIC_API_BASE_URL=/api/reception/
-ARG NEXT_PUBLIC_MEDIA_ORIGIN
 ARG NEXT_PUBLIC_PRINT_AGENT_URL
-ARG NEXT_PUBLIC_SITE_URL
 ARG NEXT_PUBLIC_API_LOGGING=false
-ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL \
-    NEXT_PUBLIC_MEDIA_ORIGIN=$NEXT_PUBLIC_MEDIA_ORIGIN \
+ENV APP_SERVER=$APP_SERVER \
+    NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL \
     NEXT_PUBLIC_PRINT_AGENT_URL=$NEXT_PUBLIC_PRINT_AGENT_URL \
-    NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL \
     NEXT_PUBLIC_API_LOGGING=$NEXT_PUBLIC_API_LOGGING \
     NEXT_TELEMETRY_DISABLED=1
 
@@ -57,7 +53,11 @@ RUN npm run build
 FROM node:22-alpine AS runner
 WORKDIR /app
 
+# Image o'zi qaysi serverga tegishli ekanini biladi, shuning uchun `docker run`
+# ga qo'shimcha bayroq kerak emas. Runtime'da buni faqat proksi zaxirasi o'qiydi.
+ARG APP_SERVER=prod
 ENV NODE_ENV=production \
+    APP_SERVER=$APP_SERVER \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
     HOSTNAME=0.0.0.0

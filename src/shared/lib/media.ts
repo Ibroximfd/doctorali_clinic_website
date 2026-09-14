@@ -1,4 +1,5 @@
 import { mediaOrigin } from "@/config/env";
+import { SERVERS } from "@config/servers.mjs";
 
 /**
  * Normalises an API image URL for display.
@@ -9,13 +10,15 @@ import { mediaOrigin } from "@/config/env";
  * caller can render its placeholder instead of a broken image.
  */
 /**
- * Hosts the image optimiser is allowed to fetch from — the same list as
- * `images.remotePatterns` in `next.config.ts`, plus whatever the media origin
- * is set to. Anything else is shown as-is: `next/image` throws on an unlisted
- * host, and a broken thumbnail column is worse than an unresized one.
+ * Hosts the image optimiser is allowed to fetch from. Derived from
+ * `config/servers.mjs` — the same source `images.remotePatterns` in
+ * `next.config.ts` reads, so the two lists cannot drift apart — plus whatever
+ * the media origin is set to. Anything else is shown as-is: `next/image`
+ * throws on an unlisted host, and a broken thumbnail column is worse than an
+ * unresized one.
  */
 const OPTIMIZABLE_HOSTS = new Set(
-  ["my.imorganic.uz", "test.imorganic.uz", safeHost(mediaOrigin)].filter(
+  [...Object.values(SERVERS).map((server) => server.host), safeHost(mediaOrigin)].filter(
     (host): host is string => host !== null,
   ),
 );

@@ -1,6 +1,13 @@
 import withBundleAnalyzer from "@next/bundle-analyzer";
 import createNextIntlPlugin from "next-intl/plugin";
 import type { NextConfig } from "next";
+import { resolveServer, SERVERS } from "./config/servers.mjs";
+
+/**
+ * Qaysi backend bilan ishlayapmiz. `config/servers.mjs` yagona manba:
+ * `DEFAULT_SERVER` yoki `APP_SERVER=test npm run dev` shuni hal qiladi.
+ */
+const server = resolveServer();
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
@@ -8,13 +15,13 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 const withAnalyzer = withBundleAnalyzer({ enabled: process.env.ANALYZE === "true" });
 
 /**
- * The hosts `next/image` may fetch from: the two known backends, plus whatever
- * the media origin is set to for this deployment. Uploads are stored at their
- * original size (multi-megabyte PNGs), so every thumbnail goes through the
- * optimiser — an unlisted host would make it throw instead.
+ * The hosts `next/image` may fetch from: every declared server, plus whatever
+ * the media origin is overridden to for this deployment. Uploads are stored at
+ * their original size (multi-megabyte PNGs), so every thumbnail goes through
+ * the optimiser — an unlisted host would make it throw instead.
  */
 function mediaRemotePatterns() {
-  const known = ["https://my.imorganic.uz", "https://test.imorganic.uz"];
+  const known = Object.values(SERVERS).map((s) => `https://${s.host}`);
   const fromEnv = [process.env.NEXT_PUBLIC_MEDIA_ORIGIN, process.env.API_PROXY_TARGET];
   const origins = new Set([...known, ...fromEnv.filter((v): v is string => Boolean(v))]);
   return [...origins].flatMap((origin) => {
@@ -34,6 +41,16 @@ function mediaRemotePatterns() {
 }
 
 const nextConfig: NextConfig = {
+  /**
+   * Tanlangan serverdan kelib chiqadigan qiymatlar. `NEXT_PUBLIC_*` build
+   * paytida bundle ichiga yoziladi — `APP_SERVER` almashsa qayta build kerak,
+   * bu Next'ning modeli. Aniq berilgan env qiymati doim ustun.
+   */
+  env: {
+    NEXT_PUBLIC_MEDIA_ORIGIN: process.env.NEXT_PUBLIC_MEDIA_ORIGIN ?? server.origin,
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL ?? server.origin,
+  },
+
   /**
    * Runs the app from a self-contained `.next/standalone` bundle, which is what
    * the Docker image copies — a production image without `node_modules` starts
@@ -81,7 +98,8 @@ const nextConfig: NextConfig = {
    * for why `/api` cannot be.
    */
   async rewrites() {
-    const target = process.env.API_PROXY_TARGET?.replace(/\/+$/, "");
+    // Aniq berilmagan bo'lsa — tanlangan serverning o'zi.
+    const target = (process.env.API_PROXY_TARGET || server.origin).replace(/\/+$/, "");
     if (!target) return [];
     // `/api` is handled by the route handler at `src/app/api/[...path]/`,
     // which preserves the trailing slash the backend's router requires. Only

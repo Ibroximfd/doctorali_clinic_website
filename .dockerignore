@@ -8,5 +8,6 @@ design
 !README.md
 .env*
 !.env.example
+deploy
 Dockerfile
 .dockerignore

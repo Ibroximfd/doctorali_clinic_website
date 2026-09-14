@@ -15,35 +15,51 @@ holds client records, till figures and staff data.
 
 ```bash
 npm install
-cp .env.example .env.local   # point NEXT_PUBLIC_API_BASE_URL at your backend
+cp .env.example .env.local
 npm run dev                  # http://localhost:3000
 ```
 
-Everything the app talks to is configured in `.env.local`:
+**Which backend it talks to is one line**, in
+[`config/servers.mjs`](./config/servers.mjs):
 
-| Variable                      | What it is                                                                           |
-| ----------------------------- | ------------------------------------------------------------------------------------ |
-| `NEXT_PUBLIC_API_BASE_URL`    | Where the browser sends API calls. Leave it as the path `/api/reception/`            |
-| `API_PROXY_TARGET`            | The backend **origin** the panel forwards those calls to (`https://my.imorganic.uz`) |
-| `NEXT_PUBLIC_MEDIA_ORIGIN`    | Where uploaded images come from                                                      |
-| `NEXT_PUBLIC_PRINT_AGENT_URL` | The ESC/POS print agent on the kassa (default `http://localhost:9110`)               |
-| `NEXT_PUBLIC_SITE_URL`        | This panel's own origin; only used by `robots.txt` / `sitemap.xml`                   |
-| `NEXT_PUBLIC_API_LOGGING`     | `true` keeps the boxed request/response console log on in a production build         |
+```js
+export const DEFAULT_SERVER = "prod"; // "test" | "prod"
+```
+
+That file is the single source of truth — the dev proxy, the media origin,
+`next/image`'s allowed hosts, the nginx config and the deploy scripts all read
+it, so a host appears in exactly one place. To switch without editing it:
+
+```bash
+APP_SERVER=test npm run dev
+APP_SERVER=test npm run build
+```
+
+An unknown name fails loudly (`resolveServer` lists the valid ones) rather than
+silently falling back to production.
+
+`.env.local` is only for the things a server cannot know, plus overrides:
+
+| Variable                      | What it is                                                                             |
+| ----------------------------- | -------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_API_BASE_URL`    | Where the browser sends API calls. Leave it as the path `/api/reception/`              |
+| `NEXT_PUBLIC_PRINT_AGENT_URL` | The ESC/POS print agent on the kassa (default `http://localhost:9110`)                 |
+| `NEXT_PUBLIC_API_LOGGING`     | `true` keeps the boxed request/response console log on in a production build           |
+| `API_PROXY_TARGET`            | **Override** — a backend origin other than the selected server's (e.g. a local Django) |
+| `NEXT_PUBLIC_MEDIA_ORIGIN`    | **Override** — where uploaded images come from                                         |
+| `NEXT_PUBLIC_SITE_URL`        | **Override** — this panel's own origin, used by `robots.txt` / `sitemap.xml`           |
 
 **Why a path and not the backend's URL.** The browser calls the panel's own
 origin and the panel forwards it to the backend, so no request is ever
 cross-origin. That means a `npm run dev` on `localhost:3000` can sign in
 against production without anyone adding `localhost` to the backend's
 `CORS_ALLOWED_ORIGINS` — which is exactly what used to fail at the login
-screen. `deploy/nginx.conf` does the same forwarding in production, so the two
-environments speak to the API through the same shape.
+screen. nginx does the same forwarding in production, so the two environments
+speak to the API through the same shape.
 
 Pointing the browser straight at the backend still works
 (`NEXT_PUBLIC_API_BASE_URL=https://my.imorganic.uz/api/reception/`), but then
 the backend has to allow this origin.
-
-Three environments are pre-declared in [`src/config/servers.ts`](./src/config/servers.ts);
-switching is one line in `.env.local`.
 
 ## Scripts
 
@@ -99,29 +115,38 @@ old build hard to change:
 
 ## Deploying
 
-```bash
-docker build -t doctor-ali-qabulxona \
-  --build-arg NEXT_PUBLIC_SITE_URL=https://qabulxona.imorganic.uz \
-  --build-arg NEXT_PUBLIC_MEDIA_ORIGIN=https://my.imorganic.uz .
+Two environments, one command each — full walkthrough in
+[`deploy/README.md`](./deploy/README.md). Hosts and ports come from
+`config/servers.mjs`, so there is no `.env` file to create on the server.
 
-# API_PROXY_TARGET is read at RUNTIME, so the backend can be switched without
-# rebuilding the image.
-docker run -d --restart unless-stopped -p 127.0.0.1:3000:3000 \
-  -e API_PROXY_TARGET=https://my.imorganic.uz \
-  --name qabulxona doctor-ali-qabulxona
+| Environment | Domain                    | Panel port       |
+| ----------- | ------------------------- | ---------------- |
+| test        | `https://imorganic.uz`    | `127.0.0.1:3001` |
+| prod        | `https://my.imorganic.uz` | `127.0.0.1:3000` |
+
+```bash
+# Once per server: TLS, then nginx.
+sudo certbot certonly --webroot -w /var/www/certbot -d my.imorganic.uz
+sudo ./deploy/nginx-setup.sh prod
+
+# Every release.
+git pull && ./deploy/deploy.sh prod
 ```
 
-Or `docker compose -f deploy/docker-compose.yml up -d --build`.
+`deploy.sh` builds the image, replaces the container and waits until the panel
+answers — it fails loudly with the last 50 log lines rather than returning a
+green shell over a dead deployment. `nginx-setup.sh` renders the template and
+only reloads if `nginx -t` passes, so a broken config never reaches a running
+server.
 
-Then put [`deploy/nginx.conf`](./deploy/nginx.conf) in `/etc/nginx/conf.d/`,
-replace the two hostnames and reload. It terminates TLS, serves `/_next/static`
-from the immutable cache, and proxies `/api` to the backend **on the same
-origin** — which is what keeps the browser out of CORS entirely.
+nginx terminates TLS, serves `/_next/static` from the immutable cache, and
+proxies `/api` to the backend **on the same origin** — which is what keeps the
+browser out of CORS entirely.
 
-`NEXT_PUBLIC_*` values are inlined at build time — that is Next's model. The
-one value most likely to change, the backend origin, is deliberately **not** one
-of them: `API_PROXY_TARGET` is read by the server at runtime, so pointing the
-panel at test instead of production is an `-e` flag and a restart.
+`NEXT_PUBLIC_*` values are inlined at build time — that is Next's model, so
+pointing a deployment at another backend is a rebuild, which is exactly what
+`./deploy/deploy.sh <env>` does. `API_PROXY_TARGET` is read at runtime and is
+only the fallback for a deployment without nginx in front.
 
 ## Printing receipts
 

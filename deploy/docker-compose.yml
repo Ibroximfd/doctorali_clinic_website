@@ -1,31 +1,50 @@
-# Runs the panel next to nginx on the clinic's own server.
+# Panelni klinikaning o'z serverida nginx yonida yuritadi.
 #
-# The API is NOT in here on purpose: it already runs (and is backed up) as its
-# own deployment, and this compose file must never become the thing that
-# restarts the backend.
+# Domen, port va backend manzili bu yerda emas — `config/servers.mjs` da.
+# `deploy/deploy.sh` o'sha fayldan o'qib, quyidagi o'zgaruvchilarni eksport
+# qilib beradi, shuning uchun bitta compose fayl test'ni ham, prod'ni ham
+# xizmat qiladi:
+#
+#   ./deploy/deploy.sh prod
+#
+# Backend ATAYLAB bu yerda yo'q: u o'zining alohida deploy'i sifatida ishlaydi va
+# bu fayl hech qachon backendni qayta ishga tushiradigan narsaga aylanmasligi kerak.
 services:
   qabulxona:
     build:
       context: ..
       dockerfile: Dockerfile
       args:
-        # Inlined at build time — see the Dockerfile's note.
-        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api/reception/}
-        NEXT_PUBLIC_MEDIA_ORIGIN: ${NEXT_PUBLIC_MEDIA_ORIGIN:-https://my.imorganic.uz}
+        # Build paytida `next.config.ts` shu nom bo'yicha serverni tanlaydi va
+        # NEXT_PUBLIC_* qiymatlarini bundle ichiga yozadi.
+        APP_SERVER: ${APP_SERVER:?deploy.sh orqali ishga tushiring}
         NEXT_PUBLIC_PRINT_AGENT_URL: ${NEXT_PUBLIC_PRINT_AGENT_URL:-http://localhost:9110}
-        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://qabulxona.imorganic.uz}
-    image: doctor-ali-qabulxona:latest
-    container_name: qabulxona
+        NEXT_PUBLIC_API_LOGGING: ${NEXT_PUBLIC_API_LOGGING:-false}
+    # Har bir muhitning o'z image tegi: prod'ni deploy qilish test image'ini
+    # bosib ketmaydi va orqaga qaytarish uchun eskisi joyida qoladi.
+    image: doctor-ali-qabulxona:${APP_SERVER}
+    container_name: ${CONTAINER_NAME:-qabulxona}
     restart: unless-stopped
     environment:
-      # Read at runtime: switching backend is a restart, not a rebuild.
-      API_PROXY_TARGET: ${API_PROXY_TARGET:-https://my.imorganic.uz}
+      # Runtime'da o'qiladi: nginx'siz holatda panelning o'zi API'ni shu serverga
+      # uzatadi.
+      APP_SERVER: ${APP_SERVER}
+      # Backendni vaqtincha boshqa manzilga qaratish — qayta build emas, restart.
+      # Bo'sh bo'lsa APP_SERVER dagi serverning o'zi ishlatiladi.
+      API_PROXY_TARGET: ${API_PROXY_TARGET:-}
+    extra_hosts:
+      # Backend shu serverda, konteynerdan tashqarida ishlayapti. Linux'da
+      # `host.docker.internal` o'zi yo'q — host-gateway uni hostning IP'siga
+      # bog'laydi.
+      - "host.docker.internal:host-gateway"
     ports:
-      - "127.0.0.1:3000:3000"
+      # Faqat loopback: tashqi dunyo panelga faqat nginx orqali kiradi.
+      - "127.0.0.1:${APP_PORT:?deploy.sh orqali ishga tushiring}:3000"
     volumes:
-      # Resized product photos and avatars. Without this the cache lives inside
-      # the container and a redeploy throws it away, so the first hour after
-      # every release is spent re-shrinking multi-megabyte originals.
+      # Kichraytirilgan mahsulot rasmlari va avatarlar. Busiz kesh konteyner
+      # ichida yashaydi va har deploy uni tashlab yuboradi — natijada har
+      # relizdan keyingi birinchi soat ko'p megabaytli originallarni qaytadan
+      # siqishga ketadi.
       - image-cache:/app/.next/cache/images
 
 volumes:

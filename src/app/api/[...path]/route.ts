@@ -1,4 +1,5 @@
 import { type NextRequest } from "next/server";
+import { resolveServer } from "@config/servers.mjs";
 
 /**
  * Same-origin proxy to the reception API.
@@ -35,26 +36,18 @@ const HOP_BY_HOP = new Set([
   "content-length",
 ]);
 
-function targetOrigin(): string | null {
+/**
+ * Aniq berilgan `API_PROXY_TARGET` doim ustun — uni runtime'da almashtirish
+ * qayta build talab qilmaydi. Berilmagan bo'lsa `config/servers.mjs` dagi
+ * tanlangan server ishlatiladi, shunda nginx'siz deploy ham ishlaydi.
+ */
+function targetOrigin(): string {
   const target = process.env.API_PROXY_TARGET?.trim().replace(/\/+$/, "");
-  return target && target !== "" ? target : null;
+  return target && target !== "" ? target : resolveServer().origin;
 }
 
 async function proxy(request: NextRequest): Promise<Response> {
   const origin = targetOrigin();
-  if (origin === null) {
-    return Response.json(
-      {
-        error: {
-          code: "proxy_not_configured",
-          message:
-            "API_PROXY_TARGET is not set. Point it at the backend origin, or " +
-            "set NEXT_PUBLIC_API_BASE_URL to the backend's absolute URL.",
-        },
-      },
-      { status: 500 },
-    );
-  }
 
   // `pathname` keeps the trailing slash the backend's router depends on.
   const url = `${origin}${request.nextUrl.pathname}${request.nextUrl.search}`;
