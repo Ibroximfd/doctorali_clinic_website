@@ -53,6 +53,7 @@ import {
   PaymentBadge,
 } from "./order-badges";
 import { OrderEditDialog } from "@/features/new-order/components/order-edit-dialog";
+import { OrderReturnDialog } from "@/features/returns/components/order-return-dialog";
 import { DoctorFilter } from "@/features/doctors/components/doctor-filter";
 import { useDoctorById } from "@/features/doctors/hooks/use-doctors";
 
@@ -107,6 +108,7 @@ export function OrdersView() {
   const [page, setPage] = useState(urlFilter.page);
 
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [returningId, setReturningId] = useState<string | null>(null);
   const [editing, setEditing] = useState<OrderDetail | null>(null);
   const [cancelling, setCancelling] = useState<OrderDetail | null>(null);
   const [deleting, setDeleting] = useState<OrderDetail | null>(null);
@@ -370,6 +372,10 @@ export function OrdersView() {
           setDetailId(null);
           setEditing(order);
         }}
+        onReturn={(order) => {
+          setDetailId(null);
+          setReturningId(order.id);
+        }}
         onCancel={(order) => {
           setDetailId(null);
           setCancelling(order);
@@ -378,6 +384,12 @@ export function OrdersView() {
           setDetailId(null);
           setDeleting(order);
         }}
+      />
+
+      <OrderReturnDialog
+        orderId={returningId}
+        open={returningId !== null}
+        onOpenChange={(open) => !open && setReturningId(null)}
       />
 
       {/* The edit opens over the list, so closing it lands back on exactly

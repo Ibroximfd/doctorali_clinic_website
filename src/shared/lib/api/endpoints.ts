@@ -95,8 +95,19 @@ export const endpoints = {
   /** Prices a basket without booking anything — the authority on the money. */
   ordersPreview: "orders/preview/",
   orderCancel: (id: string) => `orders/${id}/cancel/`,
+  /**
+   * Returns goods from a sale: stock back on the shelf, money out of the till,
+   * commission and debt reduced. ALWAYS needs `X-Confirm-Pin`, whatever the
+   * order's date — money leaves the drawer, so the day is irrelevant.
+   */
+  orderReturn: (id: string) => `orders/${id}/return/`,
   /** The same payload the create response carries, so a reprint keeps its number. */
   orderReceipt: (id: string) => `orders/${id}/receipt/`,
+
+  // --- Returns ---------------------------------------------------------------
+  returns: "returns/",
+  /** PATCH only, and only `reason` — the money and the lines are immutable. */
+  orderReturnItem: (id: string) => `returns/${id}/`,
 
   // --- Follow-ups ------------------------------------------------------------
   followups: "followups/",

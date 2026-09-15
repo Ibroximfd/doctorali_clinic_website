@@ -9,6 +9,7 @@ import { appointmentPurposeLabel } from "@/features/appointments/types/appointme
 import { DebtStatusBadge } from "@/features/debts/components/debt-status-badge";
 import { OrderEditDialog } from "@/features/new-order/components/order-edit-dialog";
 import { OrderDetailDialog } from "@/features/orders/components/order-detail-dialog";
+import { OrderReturnDialog } from "@/features/returns/components/order-return-dialog";
 import type { OrderDetail } from "@/features/orders/types/order";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { ErrorState } from "@/shared/components/feedback/error-state";
@@ -228,6 +229,7 @@ function OrdersTab({ clientId }: { clientId: number }) {
   const [page, setPage] = useState(1);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [editing, setEditing] = useState<OrderDetail | null>(null);
+  const [returningId, setReturningId] = useState<string | null>(null);
   const query = useClientOrdersTab(clientId, page);
 
   return (
@@ -278,6 +280,16 @@ function OrdersTab({ clientId }: { clientId: number }) {
           setDetailId(null);
           setEditing(order);
         }}
+        onReturn={(order) => {
+          setDetailId(null);
+          setReturningId(order.id);
+        }}
+      />
+
+      <OrderReturnDialog
+        orderId={returningId}
+        open={returningId !== null}
+        onOpenChange={(open) => !open && setReturningId(null)}
       />
 
       <OrderEditDialog

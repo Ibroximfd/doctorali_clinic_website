@@ -316,29 +316,46 @@ export function OrderSummaryPanel({
       )}
 
       <div className="flex gap-2">
-        <Button type="button" variant="outline" onClick={onReset} disabled={submitting}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onReset}
+          disabled={submitting}
+          className="shrink-0"
+        >
           {resetLabel}
         </Button>
+        {/*
+          The label and the amount are STACKED, not side by side. In one line
+          they overflowed the 380px money column — the edit dialog's, where the
+          panel is narrowest — and the figure came out clipped mid-digit
+          ("· 7 07…"), which is the one thing on this button that must never be
+          half-read. Two short lines fit at every width this panel is used at.
+        */}
         <Button
           type="button"
           onClick={onSubmit}
           disabled={submitting}
-          className="h-12 flex-1 text-base font-bold"
+          className="h-12 min-w-0 flex-1 gap-2.5"
         >
           {submitting ? (
             <span
-              className="border-primary-foreground/40 border-t-primary-foreground size-[18px] animate-spin rounded-full border-2"
+              className="border-primary-foreground/40 border-t-primary-foreground size-[18px] shrink-0 animate-spin rounded-full border-2"
               aria-hidden
             />
           ) : (
-            <Save className="size-[18px]" aria-hidden />
+            <Save className="size-[18px] shrink-0" aria-hidden />
           )}
-          <span>{editingOrder ? "O'zgarishni saqlash" : "Saqlash va chek"}</span>
-          {/* The amount on the button itself — what every till's "Charge" key
-              does, so the figure being taken is read where it is confirmed. */}
-          {paidNow > 0 && (
-            <span className="tabular font-bold opacity-90">· {money.plain(paidNow)}</span>
-          )}
+          <span className="flex min-w-0 flex-col items-start leading-tight">
+            <span className="text-label-sm truncate font-bold">
+              {editingOrder ? "O'zgarishni saqlash" : "Saqlash va chek"}
+            </span>
+            {/* The amount on the button itself — what every till's "Charge" key
+                does, so the figure being taken is read where it is confirmed. */}
+            {paidNow > 0 && (
+              <span className="tabular text-base font-bold">{money.plain(paidNow)}</span>
+            )}
+          </span>
         </Button>
       </div>
       <p className="text-caption text-text-tertiary text-center">

@@ -37,6 +37,13 @@ export type ApiErrorCode =
   | "gift_not_allowed"
   | "stock_would_go_negative"
   | "packaging_price_conflict"
+  | "order_cancelled"
+  | "not_reception_order"
+  | "invalid_refund_type"
+  | "nothing_to_return"
+  | "return_item_not_found"
+  | "invalid_quantity"
+  | "return_exceeds_quantity"
   | (string & {});
 
 /** Per-field validation messages: form field name → messages. */

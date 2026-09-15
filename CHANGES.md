@@ -400,3 +400,55 @@ the piece price (`unit_price`, sent only when touched) with the box-price
 check and the two server codes worded for the desk. The Excel export asks for
 the period first, as the Flutter app did, instead of silently taking this
 month.
+
+## 14. Vazvrat — returning goods from a sale
+
+The backend gained `POST orders/{id}/return/` (branch `develop`, migration
+`reception 0028`) and the panel had nothing for it: the only way back out of a
+sale was cancelling or editing the whole thing. It is now a feature of its own
+(`src/features/returns/`).
+
+**Where it is.** "Qaytarish" sits in the order detail's footer, beside
+"Tahrirlash" — reception reaches for one or the other from the same screen —
+and the dialog is owned by the list behind it, so closing lands back on the
+same page and filters. The client card's Buyurtmalar tab offers the same
+action. A new page, **Vazvratlar** (`/returns`), lists every return the clinic
+has made.
+
+**Three sums, never one.** `returned_value = debt_reduced + refund_amount`, and
+showing only one of them is how a desk ends up asking where the money went. The
+result panel spells out all three, the list row repeats the split under the
+value, and a return that only settled a debt says so in words: _"Naqd pul
+chiqmadi — summa mijozning qarzidan ayirildi."_ The debt is settled first by
+design, so `refund_amount` is routinely 0 on a client who owed something.
+
+**The PIN is always asked for**, whatever the order's date. An edit only needs
+it outside today; this one takes cash out of the drawer, so the day is
+irrelevant — and the server refuses a PIN-less request with `pin_required`
+anyway.
+
+**Quantities come from a fresh order, never from the row that was clicked.** A
+line already partly returned has a lower ceiling now, and the dialog refetches
+the order rather than trusting the list's cache. The whole-order case sends NO
+`items` key at all — the backend's own way of saying "all of what is left",
+which stays correct even if the order changed a second ago. A payload that
+carried no `items[].id` leaves only that path open: guessing an id would either
+be refused or, worse, match a different line, so partial selection is blocked
+with a sentence instead.
+
+**Nothing is computed twice.** The dialog's running total is marked `≈` because
+the split between the debt and the till is the server's to make, and the exact
+figures replace it the moment the answer lands. Statistics, the daily cash
+sheet and the doctor's commission need no client-side subtraction: the returned
+quantity comes off the order line itself, so every existing screen reports the
+new numbers on its own.
+
+**Only the reason is editable** (`PATCH returns/{id}/`), and the edit is
+audited. Quantities and sums are immutable — changing them would mean moving
+stock and money a second time, so a wrong return is corrected by filing
+another.
+
+**One layout bug came out with it.** The edit dialog's save button carries the
+amount now, and in the 380px money column the two did not fit on one line: the
+figure was clipped mid-digit ("· 7 07…"), which is the one thing on that button
+that must never be half-read. The label and the amount are stacked instead.

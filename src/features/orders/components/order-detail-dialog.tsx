@@ -1,12 +1,13 @@
 "use client";
 
-import { Ban, Gift, Pencil, Trash2 } from "lucide-react";
+import { Ban, Gift, Pencil, Trash2, Undo2 } from "lucide-react";
 import Link from "next/link";
 
 import { clientDetailPath } from "@/config/routes";
 import { ReceiptPrintButton } from "@/features/receipt/components/receipt-print-button";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { useDoctorById } from "@/features/doctors/hooks/use-doctors";
+import { OrderReturnsCard } from "@/features/returns/components/order-returns-card";
 import { AppAvatar } from "@/shared/components/ui/app-avatar";
 import { ProductThumb } from "@/shared/components/ui/product-thumb";
 import { Button } from "@/shared/components/ui/button";
@@ -56,6 +57,7 @@ export function OrderDetailDialog({
   onCancel,
   onDelete,
   onEdit,
+  onReturn,
 }: {
   orderId: string | null;
   open: boolean;
@@ -63,6 +65,8 @@ export function OrderDetailDialog({
   onCancel?: (order: OrderDetail) => void;
   onDelete?: (order: OrderDetail) => void;
   onEdit?: (order: OrderDetail) => void;
+  /** Opens the return form — goods back, money out of the till. */
+  onReturn?: (order: OrderDetail) => void;
 }) {
   const {
     data: order,
@@ -119,6 +123,20 @@ export function OrderDetailDialog({
                   <Button variant="outline" onClick={() => onEdit(order)}>
                     <Pencil className="size-4" aria-hidden />
                     Tahrirlash
+                  </Button>
+                )}
+                {/* A return is not a correction: the client is handing goods
+                    back, so it moves stock and cash rather than rewriting what
+                    was sold. It sits beside the edit because the desk reaches
+                    for one or the other from the same screen. */}
+                {onReturn && (
+                  <Button
+                    variant="outline"
+                    onClick={() => onReturn(order)}
+                    className="border-warning/40 text-warning hover:bg-warning/10"
+                  >
+                    <Undo2 className="size-4" aria-hidden />
+                    Qaytarish
                   </Button>
                 )}
                 {onCancel && (
@@ -237,6 +255,8 @@ function OrderDetailBody({ order }: { order: OrderDetail }) {
               ))}
             </ul>
           </div>
+
+          <OrderReturnsCard orderId={order.id} />
 
           {order.note && (
             <p className="border-border text-body-sm text-text-secondary rounded-md border p-3">

@@ -59,6 +59,16 @@ export const ORDER_STATUS_LABEL: Readonly<Record<OrderStatus, string>> = {
 /** A line item in an order detail (server-provided `unit_price` + `subtotal`). */
 export interface OrderLine {
   readonly id: string;
+  /**
+   * The order line's OWN id (`items[].id`), or null when the payload carried
+   * none.
+   *
+   * Separate from `id`, which falls back to the product id so a row always has
+   * a key. A return addresses lines by `order_item_id`, and sending a product
+   * id in that field would either be refused or — worse — match another line,
+   * so the caller that needs the real thing must be able to tell them apart.
+   */
+  readonly orderItemId: string | null;
   readonly productId: string;
   readonly productName: string;
   readonly imageUrl: string | null;
@@ -265,6 +275,8 @@ export function parseOrderLine(raw: unknown): OrderLine {
   const product = isRecord(l.product) ? l.product : {};
   return {
     id: str(l.id ?? l.product_id),
+    orderItemId:
+      typeof l.id === "string" || typeof l.id === "number" ? String(l.id) : null,
     productId: str(product.id ?? l.product_id),
     productName: str(product.name ?? l.name ?? l.product_name),
     imageUrl:
