@@ -1,8 +1,11 @@
 "use client";
 
 import { Gift, Smartphone, X } from "lucide-react";
+import { useState } from "react";
 
+import { ClientFormDialog } from "@/features/clients/components/client-form-dialog";
 import { ClientSearchField } from "@/features/clients/components/client-search-field";
+import { searchResultFromRecord } from "@/features/clients/types/client-record";
 import { searchResultName } from "@/features/clients/types/client-search";
 import { orderDisplayClientName } from "@/features/orders/types/order";
 import { DoctorPicker } from "@/features/doctors/components/doctor-picker";
@@ -50,6 +53,16 @@ export function OrderClientSection() {
   const isEditing = selectIsEditing(state);
   const doctorRequired = selectDoctorRequired(state);
   const clientInvalid = showValidation && !selectClientValid(state);
+
+  /*
+   * "Not found" is never a dead end: the empty state offers to create the card
+   * right here, over the order, with whatever was typed carried over, and the
+   * new client is selected the moment it is saved. Leaving for the clients
+   * page mid-order was the single most common interruption at the desk.
+   */
+  const [newClient, setNewClient] = useState<{ phone: string; name: string } | null>(
+    null,
+  );
 
   return (
     <div className="border-border bg-surface flex flex-col gap-4 rounded-lg border p-5 shadow-sm">
@@ -139,12 +152,40 @@ export function OrderClientSection() {
           <ClientSearchField
             id="client-search"
             onSelect={selectClient}
+            hint="Ism, telefon yoki raqamning bir qismi — qo'shimcha raqamlar ham topiladi"
             error={
               clientInvalid ? "Mijozni tanlang" : (fieldErrors.client_phone?.[0] ?? null)
             }
+            emptyAction={{
+              label: "Yangi mijoz qo'shish",
+              onSelect: (query) => {
+                const digits = query.replace(/\D/g, "");
+                setNewClient(
+                  digits.length >= 7
+                    ? { phone: phoneToApi(query), name: "" }
+                    : { phone: "", name: query },
+                );
+              },
+            }}
           />
         </div>
       )}
+
+      <ClientFormDialog
+        open={newClient !== null}
+        onOpenChange={(open) => !open && setNewClient(null)}
+        initialPhone={newClient?.phone ?? ""}
+        initialName={newClient?.name ?? ""}
+        onSaved={(record) => {
+          selectClient(searchResultFromRecord(record));
+          setNewClient(null);
+        }}
+        // The number already belongs to someone: that someone is the client.
+        onOpenDuplicate={(client) => {
+          selectClient(client);
+          setNewClient(null);
+        }}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">

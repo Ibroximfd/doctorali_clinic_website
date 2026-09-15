@@ -353,3 +353,50 @@ including the subtle backend contracts that are easy to lose in a rewrite:
 - a stock balance is never edited by hand, only by a confirmed document;
 - an uncounted stock-count line is not a line counted as zero;
 - server display text (`*_display`) always wins over a local label.
+
+## 13. The basket's money, fixed where it moved
+
+Reception reported three things after a week on the new panel, and a
+screen-by-screen re-read against the Flutter app found what the port had lost
+in the warehouse. All of it is in this pass.
+
+**A changed price froze the line.** "3 dona = 100 000" was stored as the typed
+sum and sent as `line_total`; adding a fourth unit kept the sum, so the line
+showed — and the server billed — 100 000 for four. `resizeLine` now drops the
+typed sum the moment the PAID count changes (a quantity step, a gift, a stock
+correction) and the per-unit price it produced carries on: 3 → 4 units bills
+4 × 33 333, and the figure on screen moves with the stepper again.
+
+**The price editor's ceiling is the natural total.** It used to check the unit
+price against the catalog price only, which let a boxed line be priced above
+its box price and refused by the server. The ceiling is now
+`naturalLineTotal` (the auto-boxed sum when the product sells by the box), the
+quick discounts are taken from it, typing it back restores the original price,
+and the spread unit price never rounds up to the catalog price — the rule the
+Flutter editor already had.
+
+**"Sovg'a" gives the whole line away**, as it did in Flutter, with a split
+control underneath for the rarer "one of the nine is free". A boxed line gets
+`−1 karobka` / `+1 karobka` in that control and a `+1 karobka` chip beside the
+stepper, so a box is one tap in every direction. The quantity itself is
+typeable — click the number, type 15 — the keypad every POS puts under its
+cart. `Shift+Enter` in the catalogue adds a box; `Ctrl/⌘+Enter` saves the order
+from anywhere on the form; the save button carries the amount being taken.
+
+Two counting mistakes went with it: the basket header added gift units on top
+of the quantity they are part of, and the "Savatdagi sovg'a" row was printed
+with a minus although the products line already excludes it.
+
+**The stock card got its history back.** `warehouse/stock/{id}/` has always
+returned the product's recent movements; the card now shows them, with "Barcha
+harakatlar" opening the ledger tab already narrowed to that product — and the
+ledger's own filter bar can narrow by product too. The card also opens a
+goods-in or a write-off on its own product. The write-off form itself is
+entered in BOXES and pieces for a boxed product ("2 karobka + 3 dona", with
+the conversion spelled out), prints the shelf balance on every line and turns
+red before the server can refuse `stock_would_go_negative`, and asks once more
+before the balance moves — as the Flutter form did. Its packaging block carries
+the piece price (`unit_price`, sent only when touched) with the box-price
+check and the two server codes worded for the desk. The Excel export asks for
+the period first, as the Flutter app did, instead of silently taking this
+month.

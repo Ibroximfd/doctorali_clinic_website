@@ -8,6 +8,7 @@ import {
   Stethoscope,
   TriangleAlert,
 } from "lucide-react";
+import { useEffect } from "react";
 
 import { DebtEditor, type DebtDraftState } from "@/shared/components/form/debt-editor";
 import {
@@ -100,6 +101,22 @@ export function OrderSummaryPanel({
   const blocker = selectSubmitBlocker(state);
   const overrideDelta = total - subtotal;
 
+  /**
+   * Ctrl/Cmd+Enter saves from anywhere on the form — the desk's hands are on
+   * the keyboard after typing a note or a split, and reaching for the button
+   * is the slow part. Guarded by the same flag as the button itself.
+   */
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return;
+      if (submitting || cart.length === 0) return;
+      event.preventDefault();
+      onSubmit();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onSubmit, submitting, cart.length]);
+
   const debtState: DebtDraftState = {
     enabled: state.debtEnabled,
     amount: state.debtAmount,
@@ -139,8 +156,15 @@ export function OrderSummaryPanel({
 
       <dl className="flex flex-col gap-2">
         <Row label="Mahsulotlar" value={money.plain(subtotal)} />
+        {/* In-cart gifts are already OUT of the products line, so this row only
+            reports their value — a "−" here read as a second deduction and made
+            the total look wrong by exactly the gift. */}
         {manualGift > 0 && (
-          <Row label="Savatdagi sovg'a" value={`−${money.plain(manualGift)}`} muted />
+          <Row
+            label="Savatdagi sovg'a (hisobga kirmagan)"
+            value={money.plain(manualGift)}
+            muted
+          />
         )}
         {giftDiscount > 0 && (
           <Row
@@ -309,9 +333,19 @@ export function OrderSummaryPanel({
           ) : (
             <Save className="size-[18px]" aria-hidden />
           )}
-          {editingOrder ? "O'zgarishni saqlash" : "Saqlash va chek"}
+          <span>{editingOrder ? "O'zgarishni saqlash" : "Saqlash va chek"}</span>
+          {/* The amount on the button itself — what every till's "Charge" key
+              does, so the figure being taken is read where it is confirmed. */}
+          {paidNow > 0 && (
+            <span className="tabular font-bold opacity-90">· {money.plain(paidNow)}</span>
+          )}
         </Button>
       </div>
+      <p className="text-caption text-text-tertiary text-center">
+        <kbd className="bg-surface-alt rounded px-1.5 py-0.5 text-[11px]">Ctrl</kbd>+
+        <kbd className="bg-surface-alt rounded px-1.5 py-0.5 text-[11px]">Enter</kbd>{" "}
+        saqlaydi
+      </p>
     </div>
   );
 }

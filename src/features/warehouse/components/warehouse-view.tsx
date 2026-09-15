@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import type { Product } from "@/features/products/types/product";
 import { AppCard } from "@/shared/components/data-display/app-card";
 import { ListSkeleton } from "@/shared/components/data-display/list-skeleton";
 import { PageContainer } from "@/shared/components/data-display/page-container";
@@ -24,8 +25,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select";
+import type { DateRange } from "@/shared/domain/date-range";
+import { lastDay } from "@/shared/domain/date-range-label";
 import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
-import { nowTashkent, startOfDay } from "@/shared/lib/format/date";
 import { cn } from "@/shared/lib/utils";
 
 import {
@@ -45,9 +47,10 @@ import type { StockItem } from "../types/stock";
 import { MovementsList } from "./movements-list";
 import { ReceiptFormDialog } from "./receipt-form-dialog";
 import { StockCountDialog } from "./stock-count-dialog";
-import { StockDetailDialog } from "./stock-detail-dialog";
+import { StockDetailDialog, type StockDetailActions } from "./stock-detail-dialog";
 import { StockTableHeader, StockTableRow } from "./stock-table-row";
 import { CountsList, ReceiptsList, WriteOffsList } from "./warehouse-documents";
+import { WarehouseExportDialog } from "./warehouse-export-dialog";
 import { WarehouseSummaryRow } from "./warehouse-summary-row";
 import { WriteOffFormDialog } from "./write-off-form-dialog";
 
@@ -83,9 +86,16 @@ export function WarehouseView() {
   const [page, setPage] = useState(1);
 
   const [detailItem, setDetailItem] = useState<StockItem | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [writeOffOpen, setWriteOffOpen] = useState(false);
   const [activeCount, setActiveCount] = useState<StockCount | null>(null);
+  // A document opened from a stock card starts with that product on it.
+  const [receiptProduct, setReceiptProduct] = useState<Product | null>(null);
+  const [writeOffProduct, setWriteOffProduct] = useState<Product | null>(null);
+  // The ledger's product filter lives here so the stock card can set it and
+  // switch tabs in one move.
+  const [movementsProduct, setMovementsProduct] = useState<Product | null>(null);
 
   const debouncedSearch = useDebouncedValue(search);
   const filter = useMemo<StockFilter>(
@@ -103,25 +113,34 @@ export function WarehouseView() {
     setPage(1);
   }
 
-  /**
-   * The export is a PERIOD REPORT, so it needs a range: this month is what gets
-   * exported most, and the alternative — balances only — answers a different
-   * question than the one the desk asks.
-   */
-  function exportMonth() {
-    const today = startOfDay(nowTashkent());
-    const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
-    exportWarehouse.mutate({
-      filter,
-      dateFrom: monthStart as typeof today,
-      dateTo: today,
-    });
+  /** The export is a PERIOD REPORT — the range comes from the dialog. */
+  function exportRange(range: DateRange) {
+    exportWarehouse.mutate(
+      { filter, dateFrom: range.start, dateTo: lastDay(range) },
+      { onSuccess: () => setExportOpen(false) },
+    );
   }
 
   async function startCount() {
     const count = await createCount.mutateAsync({});
     setActiveCount(count);
   }
+
+  const detailActions: StockDetailActions = {
+    onReceive(product) {
+      setReceiptProduct(product);
+      setReceiptOpen(true);
+    },
+    onWriteOff(product) {
+      setWriteOffProduct(product);
+      setWriteOffOpen(true);
+    },
+    onShowMovements(product) {
+      setMovementsProduct(product);
+      setTab("movements");
+      setDetailItem(null);
+    },
+  };
 
   return (
     <PageContainer className="flex flex-col gap-4">
@@ -140,7 +159,7 @@ export function WarehouseView() {
           <Button
             variant="outline"
             disabled={exportWarehouse.isPending}
-            onClick={exportMonth}
+            onClick={() => setExportOpen(true)}
           >
             <Download className="size-4" aria-hidden />
             Excel
@@ -288,7 +307,10 @@ export function WarehouseView() {
       )}
       {tab === "movements" && (
         <AppCard>
-          <MovementsList />
+          <MovementsList
+            product={movementsProduct}
+            onProductChange={setMovementsProduct}
+          />
         </AppCard>
       )}
 
@@ -296,9 +318,30 @@ export function WarehouseView() {
         item={detailItem}
         open={detailItem !== null}
         onOpenChange={(open) => !open && setDetailItem(null)}
+        actions={detailActions}
       />
-      <ReceiptFormDialog open={receiptOpen} onOpenChange={setReceiptOpen} />
-      <WriteOffFormDialog open={writeOffOpen} onOpenChange={setWriteOffOpen} />
+      <WarehouseExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        busy={exportWarehouse.isPending}
+        onExport={exportRange}
+      />
+      <ReceiptFormDialog
+        open={receiptOpen}
+        onOpenChange={(open) => {
+          setReceiptOpen(open);
+          if (!open) setReceiptProduct(null);
+        }}
+        initialProduct={receiptProduct}
+      />
+      <WriteOffFormDialog
+        open={writeOffOpen}
+        onOpenChange={(open) => {
+          setWriteOffOpen(open);
+          if (!open) setWriteOffProduct(null);
+        }}
+        initialProduct={writeOffProduct}
+      />
       <StockCountDialog
         count={activeCount}
         open={activeCount !== null}

@@ -1,5 +1,12 @@
-import { parseProduct, type Product } from "@/features/products/types/product";
+import {
+  parseProduct,
+  productPackaging,
+  type Product,
+} from "@/features/products/types/product";
+import { hasPackaging } from "@/shared/domain/packaging";
 import { maybeTashkentFromApi, type TashkentDate } from "@/shared/lib/format/date";
+
+import { parseStockMovement, type StockMovement } from "./movement";
 
 /**
  * Lifecycle shared by every stock document (receipt, write-off, count).
@@ -70,6 +77,12 @@ export interface StockItemDetail {
    * misleading answer than "unknown".
    */
   readonly daysOfStock: number | null;
+  /**
+   * The most recent ledger entries for this product, newest first — the
+   * "Oxirgi harakatlar" block of the stock card, so "where did the balance go?"
+   * is answered on the card itself rather than on the ledger tab.
+   */
+  readonly movements: readonly StockMovement[];
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -121,10 +134,26 @@ export function parseStockItem(raw: unknown): StockItem {
 
 export function parseStockItemDetail(raw: unknown): StockItemDetail {
   const s = isRecord(raw) ? raw : {};
+  const item = parseStockItem(s);
+  const packaging = productPackaging(item.product);
   return {
-    item: parseStockItem(s),
+    item,
     sold30d: num(s.sold_30d),
     avgDailySales: num(s.avg_daily_sales),
     daysOfStock: typeof s.days_of_stock === "number" ? s.days_of_stock : null,
+    movements: Array.isArray(s.movements)
+      ? s.movements.filter(isRecord).map((row) => {
+          const movement = parseStockMovement(row);
+          // The card's own rows need not repeat the product each time; fill
+          // what the ledger row left out from the card, so "−18" still reads
+          // as "2 karobka" here.
+          return {
+            ...movement,
+            productId: movement.productId || item.product.id,
+            productName: movement.productName || item.product.name,
+            packaging: hasPackaging(movement.packaging) ? movement.packaging : packaging,
+          };
+        })
+      : [],
   };
 }

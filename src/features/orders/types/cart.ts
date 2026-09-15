@@ -11,6 +11,7 @@ import {
   type OrderPayment,
   type PaymentType,
 } from "@/shared/domain/payment-type";
+import { money } from "@/shared/lib/format/money";
 
 /**
  * One product line in the cart.
@@ -122,6 +123,68 @@ export function lineTotal(item: CartItem): number {
 export function billingBreakdown(item: CartItem): string | null {
   if (!autoBoxes(item) || packagesBilled(item) === 0) return null;
   return formatProductUnits(item.product, paidQuantity(item));
+}
+
+/**
+ * "2 karobka × 850 000 + 3 dona × 100 000" — the exact composition of an
+ * auto-boxed total, so the client at the desk sees which units went at which
+ * price. Null when the line is priced plainly.
+ */
+export function billingDetail(item: CartItem): string | null {
+  if (!autoBoxes(item) || packagesBilled(item) === 0) return null;
+  const product = item.product;
+  const boxes =
+    `${packagesBilled(item)} ${product.packageLabel} × ` +
+    money.plain(product.packagePrice as number);
+  const loose = looseBilled(item);
+  if (loose === 0) return boxes;
+  return `${boxes} + ${loose} dona × ${money.plain(unitPrice(item))}`;
+}
+
+/**
+ * What the line bills at with no manual price: the catalog sum, or the
+ * auto-boxed one when the product sells by the box. This is the CEILING of a
+ * manual price — the editor lowers a total, it never raises one, and the
+ * backend answers `price_above_catalog` for anything above this figure.
+ */
+export function naturalLineTotal(item: CartItem): number {
+  return lineTotal({ ...item, customPrice: null, customLineTotal: null });
+}
+
+/**
+ * The per-unit price that lands as close to `total` as whole so'm allow.
+ *
+ * It never rounds UP to the catalog price: that reads as "no discount"
+ * downstream and would quietly put the full sum back on the line.
+ */
+export function unitPriceForTotal(item: CartItem, total: number): number {
+  const paid = Math.max(1, paidQuantity(item));
+  const rounded = Math.round(total / paid);
+  const unit = rounded >= item.product.priceUzs ? Math.trunc(total / paid) : rounded;
+  return Math.max(1, unit);
+}
+
+/**
+ * The line with a new quantity and gift count.
+ *
+ * The typed line sum ("3 dona = 100 000") describes exactly the paid units it
+ * was typed for. Once that count changes the sum no longer applies — kept, it
+ * would bill FOUR units for the 100 000 typed for three, and the figure on
+ * screen would sit frozen while the stepper moved. So the sum is dropped and
+ * the per-unit price it produced carries on: 3 → 4 units bills 4 × 33 333.
+ */
+export function resizeLine(
+  item: CartItem,
+  next: { quantity: number; giftQuantity: number },
+): CartItem {
+  const resized = { ...item, quantity: next.quantity, giftQuantity: next.giftQuantity };
+  if (paidQuantity(resized) === paidQuantity(item)) return resized;
+  return { ...resized, customLineTotal: null };
+}
+
+/** Every unit in the basket — gift units are part of `quantity`, not on top of it. */
+export function cartUnitCount(items: readonly CartItem[]): number {
+  return items.reduce((sum, item) => sum + item.quantity, 0);
 }
 
 // --- Quantity rules ----------------------------------------------------------

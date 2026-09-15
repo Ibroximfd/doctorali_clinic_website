@@ -68,17 +68,28 @@ export interface ClientSearchResult {
 }
 
 /**
- * Name safe to render: the server's `display_name` wins (ready text is never
- * re-derived locally), then the raw name, then the last four digits so a card
- * created from a phone alone is still identifiable.
+ * Name safe to render: the card's own name first, then the server's
+ * `display_name`, then the last four digits so a card created from a phone
+ * alone is still identifiable.
+ *
+ * The raw name wins over the server's ready-made text on purpose. Reception
+ * reported cards whose name is in the base showing up as "Mijoz 1234" in the
+ * typeahead: the server's `display_name` is derived from a different field than
+ * the one the name was saved in, and a placeholder must never outrank a real
+ * name that arrived in the same payload.
  */
 export function searchResultName(client: ClientSearchResult): string {
-  const server = client.serverDisplayName.trim();
-  if (server !== "") return server;
   const name = client.fullName.trim();
   if (name !== "") return name;
+  const server = client.serverDisplayName.trim();
+  if (server !== "") return server;
   const digits = client.phone.replace(/\D/g, "");
   return digits.length >= 4 ? `Mijoz ${digits.slice(-4)}` : "Mijoz";
+}
+
+/** True when the row has nothing better than the "Mijoz 1234" stand-in. */
+export function isUnnamed(client: ClientSearchResult): boolean {
+  return client.fullName.trim() === "" && client.serverDisplayName.trim() === "";
 }
 
 export function hasOpenDebt(client: ClientSearchResult): boolean {
@@ -92,11 +103,33 @@ function str(v: unknown, fallback = ""): string {
   return v === null || v === undefined ? fallback : String(v);
 }
 
+/**
+ * The name under whichever key this payload spells it. The typeahead, the CRM
+ * list and the legacy phone lookup have not always agreed on one, and a card
+ * whose name sits under `name` must not render as "Mijoz 1234".
+ */
+function pickName(c: Record<string, unknown>): string {
+  for (const key of ["full_name", "name", "client_name", "fio"]) {
+    const value = str(c[key]).trim();
+    if (value !== "") return value;
+  }
+  return [str(c.first_name), str(c.last_name)]
+    .map((part) => part.trim())
+    .filter((part) => part !== "")
+    .join(" ");
+}
+
+/** Tolerates an id sent as a string, which some list endpoints still do. */
+function id(v: unknown): number {
+  const parsed = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 export function parseClientSearchResult(raw: unknown): ClientSearchResult {
   const c = (raw ?? {}) as Record<string, unknown>;
   return {
-    id: num(c.id),
-    fullName: str(c.full_name),
+    id: id(c.id),
+    fullName: pickName(c),
     phone: str(c.phone),
     isAppUser: c.is_app_user === true,
     serverDisplayName: str(c.display_name),

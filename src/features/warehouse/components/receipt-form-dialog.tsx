@@ -33,6 +33,7 @@ import {
   receiptDraftCost,
   type StockReceiptLine,
 } from "../types/receipt";
+import { NumberField } from "./document-line-fields";
 import { EmptyDocumentLines, ProductSearchPicker } from "./product-search-picker";
 
 /**
@@ -50,24 +51,41 @@ import { EmptyDocumentLines, ProductSearchPicker } from "./product-search-picker
 export function ReceiptFormDialog({
   open,
   onOpenChange,
+  initialProduct = null,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** A first line already on the form — the stock card's "Kirim qilish". */
+  initialProduct?: Product | null;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {open && <ReceiptFormBody onOpenChange={onOpenChange} />}
+      {open && (
+        <ReceiptFormBody onOpenChange={onOpenChange} initialProduct={initialProduct} />
+      )}
     </Dialog>
   );
 }
 
-function ReceiptFormBody({ onOpenChange }: { onOpenChange: (open: boolean) => void }) {
+function newReceiptLine(product: Product): StockReceiptLine {
+  return { product, quantity: 0, packages: 0, unitCost: 0, packageCost: 0 };
+}
+
+function ReceiptFormBody({
+  onOpenChange,
+  initialProduct,
+}: {
+  onOpenChange: (open: boolean) => void;
+  initialProduct: Product | null;
+}) {
   const create = useCreateReceipt();
   const confirm = useConfirmReceipt();
 
   const [supplier, setSupplier] = useState("");
   const [note, setNote] = useState("");
-  const [lines, setLines] = useState<StockReceiptLine[]>([]);
+  const [lines, setLines] = useState<StockReceiptLine[]>(() =>
+    initialProduct ? [newReceiptLine(initialProduct)] : [],
+  );
   const [error, setError] = useState<string | null>(null);
   // One key for this form's whole life, so a retried save cannot double a
   // delivery that actually went through.
@@ -79,10 +97,7 @@ function ReceiptFormBody({ onOpenChange }: { onOpenChange: (open: boolean) => vo
   const canSave = lines.length > 0 && lines.every((line) => lineTotalUnits(line) > 0);
 
   function addProduct(product: Product) {
-    setLines((current) => [
-      ...current,
-      { product, quantity: 0, packages: 0, unitCost: 0, packageCost: 0 },
-    ]);
+    setLines((current) => [...current, newReceiptLine(product)]);
   }
 
   function updateLine(index: number, patch: Partial<StockReceiptLine>) {
@@ -309,33 +324,6 @@ function ReceiptLineEditor({
           Narx kiritilmadi — mavjud tannarx o&rsquo;zgarmaydi.
         </p>
       )}
-    </div>
-  );
-}
-
-function NumberField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <div className="space-y-1">
-      <span className="text-label-xs text-text-tertiary">{label}</span>
-      <Input
-        inputMode="numeric"
-        value={value === 0 ? "" : String(value)}
-        placeholder="0"
-        onChange={(event) => {
-          const digits = event.target.value.replace(/\D/g, "");
-          onChange(digits === "" ? 0 : Number(digits));
-        }}
-        className="tabular h-[38px]"
-        aria-label={label}
-      />
     </div>
   );
 }

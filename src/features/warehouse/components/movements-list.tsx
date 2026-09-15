@@ -5,6 +5,7 @@ import {
   ClipboardCheck,
   Gift,
   History,
+  Package,
   ShoppingCart,
   Trash2,
   Undo2,
@@ -12,12 +13,14 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import type { Product } from "@/features/products/types/product";
+import { ActiveFilters } from "@/shared/components/data-display/active-filters";
+import { DateFilter } from "@/shared/components/data-display/date-filter";
+import { FilterBar, FilterSelect } from "@/shared/components/data-display/filter-bar";
+import { ListSkeleton } from "@/shared/components/data-display/list-skeleton";
 import { PaginationBar } from "@/shared/components/data-display/pagination-bar";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { ErrorState } from "@/shared/components/feedback/error-state";
-import { ListSkeleton } from "@/shared/components/data-display/list-skeleton";
-import { DateFilter } from "@/shared/components/data-display/date-filter";
-import { FilterBar, FilterSelect } from "@/shared/components/data-display/filter-bar";
 import type { DateRange } from "@/shared/domain/date-range";
 import { addDays, shortDateTime } from "@/shared/lib/format/date";
 import { cn } from "@/shared/lib/utils";
@@ -29,11 +32,13 @@ import {
   MOVEMENT_TYPE_LABEL,
   movementSourceLabel,
   movementTypeLabel,
+  packagedBalanceLabel,
   packagedQuantityLabel,
   signedQuantityLabel,
   type StockMovement,
   type StockMovementType,
 } from "../types/movement";
+import { ProductSearchPicker } from "./product-search-picker";
 
 const PAGE_SIZE = 20;
 
@@ -55,15 +60,34 @@ const ICON: Readonly<Record<StockMovementType, LucideIcon>> = {
  * Each row carries the signed quantity AND the balance it left behind, so any
  * figure on the balances tab can be traced back to the movements that produced
  * it — which is the entire reason the ledger exists.
+ *
+ * The product filter is owned by the caller: the stock card's "Barcha
+ * harakatlar" lands here with its product already chosen, and the chip that
+ * says so has to survive the tab switch.
  */
-export function MovementsList({ productId }: { productId?: string | null }) {
+export function MovementsList({
+  product = null,
+  onProductChange,
+}: {
+  /** Narrows the ledger to one product; null is the whole room. */
+  product?: Product | null;
+  /** Offered when the list may be narrowed by product from its own filter bar. */
+  onProductChange?: (product: Product | null) => void;
+}) {
   const [type, setType] = useState<StockMovementType | null>(null);
   const [range, setRange] = useState<DateRange | null>(null);
-  const [page, setPage] = useState(1);
+  // The page is stored WITH the product it belongs to, so a product chosen
+  // elsewhere (the stock card) resets it during render rather than leaving
+  // page 3 of another product's history on screen.
+  const productId = product?.id ?? null;
+  const [pageState, setPageState] = useState({ productId, page: 1 });
+  if (pageState.productId !== productId) setPageState({ productId, page: 1 });
+  const page = pageState.page;
+  const setPage = (next: number) => setPageState({ productId, page: next });
 
   const filter = useMemo<MovementFilter>(
     () => ({
-      productId: productId ?? null,
+      productId,
       type,
       dateFrom: range?.start ?? null,
       // The app's range end is exclusive; the API's `date_to` is inclusive.
@@ -97,14 +121,47 @@ export function MovementsList({ productId }: { productId?: string | null }) {
           allLabel="Barcha harakatlar"
           width="w-[210px]"
         />
+        {onProductChange && (
+          <ProductSearchPicker
+            label={product ? product.name : "Mahsulot bo'yicha"}
+            onSelect={onProductChange}
+            className={cn(
+              "h-[38px] w-auto max-w-[260px]",
+              product !== null &&
+                "border-primary/35 bg-primary-soft/60 text-primary-dark hover:bg-primary-soft",
+            )}
+          />
+        )}
       </FilterBar>
+
+      {product && onProductChange && (
+        <ActiveFilters
+          filters={[
+            {
+              id: "product",
+              label: product.name,
+              icon: Package,
+              emphasized: true,
+              onClear: () => onProductChange(null),
+            },
+          ]}
+        />
+      )}
 
       {list.error && !list.data ? (
         <ErrorState error={list.error} onRetry={() => void list.refetch()} />
       ) : list.isPending || !list.data ? (
         <ListSkeleton rows={8} height={56} />
       ) : list.data.results.length === 0 ? (
-        <EmptyState icon={History} title="Harakat yo'q" />
+        <EmptyState
+          icon={History}
+          title="Harakat yo'q"
+          message={
+            product
+              ? `${product.name} bo'yicha tanlangan davrda harakat yozilmagan.`
+              : "Tanlangan filtr bo'yicha sklad harakati yo'q."
+          }
+        />
       ) : (
         <>
           <ul
@@ -114,7 +171,7 @@ export function MovementsList({ productId }: { productId?: string | null }) {
           >
             {list.data.results.map((movement) => (
               <li key={movement.id}>
-                <MovementRow movement={movement} />
+                <MovementRow movement={movement} hideProduct={product !== null} />
               </li>
             ))}
           </ul>
@@ -131,10 +188,33 @@ export function MovementsList({ productId }: { productId?: string | null }) {
   );
 }
 
-function MovementRow({ movement }: { movement: StockMovement }) {
+/**
+ * One line of the ledger. The signed quantity is the point of the row, so it
+ * is the largest thing on it — green for stock arriving, red for stock leaving
+ * — followed by the balance it left behind.
+ */
+export function MovementRow({
+  movement,
+  hideProduct = false,
+}: {
+  movement: StockMovement;
+  /** On a list that is already about one product the name is noise. */
+  hideProduct?: boolean;
+}) {
   const Icon = ICON[movement.type];
   const inbound = movement.quantity > 0;
   const packaged = packagedQuantityLabel(movement);
+  const title =
+    hideProduct || movement.productName === ""
+      ? movementTypeLabel(movement)
+      : movement.productName;
+  const meta = [
+    hideProduct || movement.productName === "" ? null : movementTypeLabel(movement),
+    shortDateTime(movement.createdAt),
+    movement.source ? movementSourceLabel(movement.source) : null,
+    movement.createdByName !== "" ? movement.createdByName : null,
+    movement.note !== "" ? movement.note : null,
+  ].filter((part): part is string => part !== null);
 
   return (
     <div className="flex items-center gap-3 px-3 py-2.5">
@@ -148,11 +228,9 @@ function MovementRow({ movement }: { movement: StockMovement }) {
       </span>
 
       <span className="min-w-0 flex-1">
-        <span className="text-title-sm block truncate">{movement.productName}</span>
+        <span className="text-title-sm block truncate">{title}</span>
         <span className="text-caption text-text-tertiary tabular block truncate">
-          {movementTypeLabel(movement)} · {shortDateTime(movement.createdAt)}
-          {movement.source && ` · ${movementSourceLabel(movement.source)}`}
-          {movement.createdByName !== "" && ` · ${movement.createdByName}`}
+          {meta.join(" · ")}
         </span>
       </span>
 
@@ -167,7 +245,7 @@ function MovementRow({ movement }: { movement: StockMovement }) {
         </span>
         <span className="text-caption text-text-tertiary tabular block">
           {packaged !== "" ? `${packaged} · ` : ""}
-          qoldiq {movement.balanceAfter}
+          qoldiq {packagedBalanceLabel(movement)}
         </span>
       </span>
     </div>

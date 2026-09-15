@@ -10,9 +10,11 @@ import { PageContainer } from "@/shared/components/data-display/page-container";
 import { Button } from "@/shared/components/ui/button";
 import { money } from "@/shared/lib/format/money";
 
+import { cartUnitCount } from "@/features/orders/types/cart";
+import type { Product } from "@/features/products/types/product";
+
 import { useNewOrderSession } from "../hooks/use-new-order-session";
 import { selectSubtotal, useNewOrderStore } from "../store/new-order-store";
-import type { Product } from "@/features/products/types/product";
 import { OrderCartPanel } from "./order-cart-panel";
 import { ProductPicker } from "./product-picker";
 
@@ -52,7 +54,7 @@ export function ProductSelectView() {
     [cart],
   );
 
-  const units = cart.reduce((sum, item) => sum + item.quantity + item.giftQuantity, 0);
+  const units = cartUnitCount(cart);
 
   /*
    * Escape goes back to the order, basket and all.

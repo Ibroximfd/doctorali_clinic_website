@@ -9,11 +9,13 @@ import type { Doctor } from "@/features/doctors/types/doctor";
 import {
   allowedGift,
   allowedQuantity,
+  cartUnitCount,
   computeCartTotals,
   hasCustomPrice,
   lineTotal,
   newCartItem,
   paidQuantity,
+  resizeLine,
   stockLimitNotice,
   unitPrice,
   unsellableReason,
@@ -324,8 +326,15 @@ export function createNewOrderStore() {
           return;
         }
 
-        if (index >= 0) cart[index] = { ...cart[index], quantity: allowed };
-        else cart.push(newCartItem(product, allowed));
+        if (index >= 0) {
+          const line = cart[index];
+          cart[index] = resizeLine(line, {
+            quantity: allowed,
+            giftQuantity: line.giftQuantity,
+          });
+        } else {
+          cart.push(newCartItem(product, allowed));
+        }
 
         set({
           cart,
@@ -356,13 +365,12 @@ export function createNewOrderStore() {
         set({
           cart: get().cart.map((line) =>
             line.product.id === productId
-              ? {
-                  ...line,
+              ? resizeLine(line, {
                   quantity: allowed,
                   // Never let the gift count exceed the (possibly lowered)
                   // quantity either.
                   giftQuantity: allowedGift(line.product, line.giftQuantity, allowed),
-                }
+                })
               : line,
           ),
           notice: allowed < quantity ? stockLimitNotice(item.product) : null,
@@ -402,10 +410,12 @@ export function createNewOrderStore() {
         set({
           cart: get().cart.map((item) =>
             item.product.id === productId
-              ? {
-                  ...item,
+              ? // Gifting changes how many units are PAID for, so a typed line
+                // sum is dropped here exactly as it is on a quantity change.
+                resizeLine(item, {
+                  quantity: item.quantity,
                   giftQuantity: allowedGift(item.product, giftQuantity, item.quantity),
-                }
+                })
               : item,
           ),
         });
@@ -567,12 +577,13 @@ export function createNewOrderStore() {
             // as it is — visibly wrong next to the error text — rather than
             // silently deleting what reception just tried to sell.
             const quantity = allowed > 0 ? allowed : item.quantity;
-            return {
-              ...item,
-              product,
-              quantity,
-              giftQuantity: allowedGift(product, item.giftQuantity, quantity),
-            };
+            return resizeLine(
+              { ...item, product },
+              {
+                quantity,
+                giftQuantity: allowedGift(product, item.giftQuantity, quantity),
+              },
+            );
           }),
         });
         clampDebt();
@@ -878,7 +889,7 @@ export function selectServerLineTotal(
 }
 
 export function selectUnitCount(state: NewOrderState): number {
-  return state.cart.reduce((sum, item) => sum + item.quantity, 0);
+  return cartUnitCount(state.cart);
 }
 
 /** Value of units handed over free as in-cart gifts, for the summary. */

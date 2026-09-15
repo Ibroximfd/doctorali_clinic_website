@@ -17,9 +17,11 @@ import {
 } from "@/shared/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
 import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
+import { cn } from "@/shared/lib/utils";
 
 /**
- * Adds a product to a warehouse document.
+ * Picks a product by name — for a warehouse document's lines, and for the
+ * ledger's product filter.
  *
  * Every row prints the current balance, because the number reception is about
  * to change is the number they need to see while choosing.
@@ -28,11 +30,14 @@ export function ProductSearchPicker({
   onSelect,
   excludeIds = [],
   label = "Mahsulot qo'shish",
+  className,
 }: {
   onSelect: (product: Product) => void;
   /** Products already on the document — offering them twice invites a refusal. */
   excludeIds?: readonly string[];
   label?: string;
+  /** Sizing and tint of the trigger — a filter chip is narrower than a form row. */
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -46,14 +51,18 @@ export function ProductSearchPicker({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type="button" variant="outline" className="w-full justify-start">
-          <Plus className="size-4" aria-hidden />
-          {label}
+        <Button
+          type="button"
+          variant="outline"
+          className={cn("w-full justify-start", className)}
+        >
+          <Plus className="size-4 shrink-0" aria-hidden />
+          <span className="min-w-0 truncate">{label}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="w-[var(--radix-popover-trigger-width)] p-0"
+        className="w-[var(--radix-popover-trigger-width)] min-w-[320px] p-0"
       >
         <Command shouldFilter={false}>
           <CommandInput

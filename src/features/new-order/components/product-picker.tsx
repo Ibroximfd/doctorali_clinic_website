@@ -4,7 +4,7 @@ import { PackageSearch, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useProductsInfiniteQuery } from "@/features/products/hooks/use-products";
-import type { Product } from "@/features/products/types/product";
+import { productHasPackaging, type Product } from "@/features/products/types/product";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { Button } from "@/shared/components/ui/button";
@@ -105,7 +105,18 @@ export function ProductPicker({
       } else if (event.key === "Enter") {
         event.preventDefault();
         const product = products[cursor];
-        if (product) onAdd(product);
+        if (!product) return;
+        // Shift+Enter puts a whole box in — the keyboard's version of the
+        // card's "1 karobka" row.
+        if (
+          event.shiftKey &&
+          productHasPackaging(product) &&
+          product.packageSize !== null
+        ) {
+          onAdd(product, product.packageSize);
+        } else {
+          onAdd(product);
+        }
       } else if (event.key === "Escape" && search !== "") {
         event.preventDefault();
         setSearch("");
@@ -159,7 +170,10 @@ export function ProductPicker({
         <kbd className="border-border bg-surface-alt rounded-xs border px-1">↓</kbd>{" "}
         tanlash ·{" "}
         <kbd className="border-border bg-surface-alt rounded-xs border px-1">Enter</kbd>{" "}
-        savatga qo&rsquo;shish
+        savatga qo&rsquo;shish ·{" "}
+        <kbd className="border-border bg-surface-alt rounded-xs border px-1">Shift</kbd>+
+        <kbd className="border-border bg-surface-alt rounded-xs border px-1">Enter</kbd>{" "}
+        butun karobka
       </p>
 
       {/*
@@ -173,7 +187,7 @@ export function ProductPicker({
           <ErrorState error={error} onRetry={() => void refetch()} />
         ) : isPending ? (
           <div
-            className="grid gap-3 @lg/catalog:grid-cols-2 @4xl/catalog:grid-cols-3"
+            className="grid gap-3 @lg/catalog:grid-cols-2 @4xl/catalog:grid-cols-3 @6xl/catalog:grid-cols-4"
             aria-hidden
           >
             {Array.from({ length: 6 }, (_, i) => (
@@ -190,7 +204,7 @@ export function ProductPicker({
           />
         ) : (
           <>
-            <div className="grid gap-3 @lg/catalog:grid-cols-2 @4xl/catalog:grid-cols-3">
+            <div className="grid gap-3 @lg/catalog:grid-cols-2 @4xl/catalog:grid-cols-3 @6xl/catalog:grid-cols-4">
               {products.map((product, index) => (
                 <ProductPickCard
                   key={product.id}

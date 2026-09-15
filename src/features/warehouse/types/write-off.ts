@@ -1,4 +1,9 @@
-import { parseProduct, type Product } from "@/features/products/types/product";
+import {
+  formatProductUnits,
+  maxSellableQuantity,
+  parseProduct,
+  type Product,
+} from "@/features/products/types/product";
 import {
   maybeTashkentFromApi,
   tashkentFromApi,
@@ -63,17 +68,39 @@ export function writeOffTotalUnits(doc: StockWriteOff): number {
   return doc.lines.reduce((sum, line) => sum + line.quantity, 0);
 }
 
+export interface WriteOffDraftInput {
+  readonly reason: WriteOffReason;
+  readonly note: string;
+  readonly lines: readonly StockWriteOffLine[];
+}
+
+/**
+ * The one thing standing between the form and a save, worded for the desk —
+ * null when valid.
+ *
+ * Mirrors the backend's rules (at least one line, a note for "Boshqa") plus
+ * the shelf itself: a write-off larger than the balance is refused as
+ * `stock_would_go_negative`, and saying so next to the line saves the round
+ * trip and the guessing.
+ */
+export function writeOffBlocker(input: WriteOffDraftInput): string | null {
+  if (input.lines.length === 0) return "Kamida bitta mahsulot qo'shing";
+  for (const line of input.lines) {
+    if (line.quantity <= 0) return `${line.product.name}: miqdorni kiriting`;
+    const available = maxSellableQuantity(line.product);
+    if (available !== null && line.quantity > available) {
+      return `${line.product.name}: omborda faqat ${formatProductUnits(line.product, available)}`;
+    }
+  }
+  if (reasonRequiresNote(input.reason) && input.note.trim() === "") {
+    return "«Boshqa» sababi uchun izoh majburiy";
+  }
+  return null;
+}
+
 /** Mirrors the backend rule, so the form can block before the request. */
-export function isWriteOffValid(input: {
-  reason: WriteOffReason;
-  note: string;
-  lines: readonly StockWriteOffLine[];
-}): boolean {
-  return (
-    input.lines.length > 0 &&
-    input.lines.every((line) => line.quantity > 0) &&
-    (!reasonRequiresNote(input.reason) || input.note.trim() !== "")
-  );
+export function isWriteOffValid(input: WriteOffDraftInput): boolean {
+  return writeOffBlocker(input) === null;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {

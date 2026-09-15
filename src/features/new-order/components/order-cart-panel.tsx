@@ -8,6 +8,7 @@ import { Button } from "@/shared/components/ui/button";
 import { money } from "@/shared/lib/format/money";
 import { cn } from "@/shared/lib/utils";
 
+import { cartUnitCount } from "@/features/orders/types/cart";
 import { paidLineFor } from "@/features/orders/types/order-preview";
 
 import { selectSubtotal, useNewOrderStore } from "../store/new-order-store";
@@ -51,7 +52,9 @@ export function OrderCartPanel({
   const setLinePrice = useNewOrderStore((s) => s.setLinePrice);
   const setLineGift = useNewOrderStore((s) => s.setLineGift);
   const removeProduct = useNewOrderStore((s) => s.removeProduct);
-  const units = cart.reduce((sum, item) => sum + item.quantity + item.giftQuantity, 0);
+  // Gift units are PART of a line's quantity, not on top of it — adding them
+  // again used to count "9 dona, 1 sovg'a" as ten.
+  const units = cartUnitCount(cart);
 
   return (
     <section

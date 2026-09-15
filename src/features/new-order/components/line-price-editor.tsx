@@ -4,7 +4,15 @@ import { Pencil, RotateCcw, Tag } from "lucide-react";
 import { useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import type { CartItem } from "@/features/orders/types/cart";
-import { hasCustomPrice, paidQuantity, unitPrice } from "@/features/orders/types/cart";
+import {
+  hasCustomPrice,
+  lineTotal,
+  naturalLineTotal,
+  packagesBilled,
+  paidQuantity,
+  unitPrice,
+  unitPriceForTotal,
+} from "@/features/orders/types/cart";
 import { MoneyInput } from "@/shared/components/form/money-input";
 import { Button } from "@/shared/components/ui/button";
 import { Label } from "@/shared/components/ui/label";
@@ -32,8 +40,10 @@ export interface LinePriceInput {
  *    the server as `line_total` and the server does the spreading. Dividing
  *    here would bill 99 999.
  *
- * Typing in either field updates the other live, so the desk always sees both
- * halves of the deal it is making.
+ * The ceiling is the line's NATURAL total — the auto-boxed sum for a product
+ * that sells by the box, the catalog sum otherwise. A price can only be lowered
+ * (the backend refuses `price_above_catalog`), and typing the natural sum back
+ * is how the original price returns.
  */
 export function LinePriceEditor({
   item,
@@ -47,17 +57,17 @@ export function LinePriceEditor({
 }) {
   const [open, setOpen] = useState(false);
   const paid = paidQuantity(item);
-  const catalogPrice = item.product.priceUzs;
   const edited = hasCustomPrice(item);
+  const natural = naturalLineTotal(item);
+  const boxed = packagesBilled(item) > 0;
   /*
    * What this line costs is the SERVER's figure, or the sum reception typed
    * itself — both are billed exactly as shown. Only when neither exists yet
-   * does the piece price stand in, and then it is marked "≈": a box of nine is
-   * routinely cheaper than nine pieces, so the local multiplication is an
-   * estimate and never the price.
+   * does the local sum stand in, and then it is marked "≈": the server may
+   * still spread or box the line differently.
    */
   const exactTotal = serverLineTotal ?? item.customLineTotal;
-  const displayTotal = exactTotal ?? unitPrice(item) * paid;
+  const displayTotal = exactTotal ?? lineTotal(item);
   const estimated = exactTotal === null && paid > 0;
 
   return (
@@ -87,8 +97,16 @@ export function LinePriceEditor({
             />
           </span>
           <span className="text-caption text-text-tertiary tabular flex items-baseline gap-1 whitespace-nowrap">
-            {edited && <s className="opacity-70">{money.plain(catalogPrice)}</s>}
-            <span>{money.plain(unitPrice(item))} / dona</span>
+            {edited ? (
+              <>
+                <s className="opacity-70">{money.plain(natural)}</s>
+                <span>{money.plain(unitPrice(item))} / dona</span>
+              </>
+            ) : boxed ? (
+              <span>{item.product.packageLabel} narxida</span>
+            ) : (
+              <span>{money.plain(unitPrice(item))} / dona</span>
+            )}
           </span>
         </button>
       </PopoverTrigger>
@@ -131,9 +149,11 @@ function PriceForm({
   onApply: (input: LinePriceInput) => void;
   onCancel: () => void;
 }) {
-  const catalogPrice = item.product.priceUzs;
-  const [unit, setUnit] = useState(() => unitPrice(item));
+  const natural = naturalLineTotal(item);
+  const boxed = packagesBilled(item) > 0;
+  const divisor = Math.max(1, paid);
   const [total, setTotal] = useState(() => currentTotal);
+  const [unit, setUnit] = useState(() => Math.round(currentTotal / divisor));
 
   /** Editing the unit price recomputes the line sum. */
   function changeUnit(value: number) {
@@ -147,19 +167,24 @@ function PriceForm({
    */
   function changeTotal(value: number) {
     setTotal(value);
-    setUnit(paid > 0 ? Math.round(value / paid) : 0);
+    setUnit(Math.round(value / divisor));
   }
 
-  const invalid = unit > catalogPrice;
+  const tooHigh = total > natural;
+  const empty = total <= 0;
+  const isNatural = total === natural;
   const discount =
-    catalogPrice > 0 ? Math.round(((catalogPrice - unit) / catalogPrice) * 100) : 0;
+    natural > 0 && !tooHigh ? Math.round(((natural - total) / natural) * 100) : 0;
+  const spreadUnit = unitPriceForTotal(item, total);
+  const unevenSplit = !tooHigh && !empty && !isNatural && spreadUnit * paid !== total;
 
   function commit() {
-    if (invalid) return;
-    // At or above the catalog price means "no discount" — the backend rejects a
-    // price above it anyway, so the override is simply dropped.
-    if (unit <= 0 || unit >= catalogPrice) onApply({ unitPrice: null, lineTotal: null });
-    else onApply({ unitPrice: unit, lineTotal: total });
+    if (tooHigh || empty) return;
+    // Typing the untouched sum back is how the original price returns: it
+    // clears the override instead of pinning the same figure by hand (which
+    // would also switch auto-boxing off for nothing).
+    if (isNatural) onApply({ unitPrice: null, lineTotal: null });
+    else onApply({ unitPrice: spreadUnit, lineTotal: total });
   }
 
   /**
@@ -183,7 +208,8 @@ function PriceForm({
       <div>
         <p className="text-title-sm">{item.product.name}</p>
         <p className="text-caption text-text-tertiary tabular mt-0.5">
-          Katalog narxi {money.uzs(catalogPrice)} · {paid} dona
+          {paid} dona · asl summa {money.uzs(natural)}
+          {boxed && ` · ${item.product.packageLabel} narxi qo'llangan`}
         </p>
       </div>
 
@@ -194,8 +220,8 @@ function PriceForm({
           value={unit}
           onValueChange={changeUnit}
           autoFocus
-          aria-invalid={invalid}
-          aria-describedby={invalid ? "line-price-error" : undefined}
+          aria-invalid={tooHigh}
+          aria-describedby={tooHigh ? "line-price-error" : undefined}
           className="h-11 text-right text-lg font-bold"
         />
       </div>
@@ -215,6 +241,7 @@ function PriceForm({
             id="line-total"
             value={total}
             onValueChange={changeTotal}
+            aria-invalid={tooHigh}
             className="h-11 text-right text-lg font-bold"
           />
           <p className="text-caption text-text-tertiary">
@@ -223,15 +250,19 @@ function PriceForm({
         </div>
       )}
 
-      {invalid ? (
+      {tooHigh ? (
         <p id="line-price-error" role="alert" className="text-caption text-danger">
-          Narx katalog narxidan yuqori bo&rsquo;lishi mumkin emas
+          Summani oshirib bo&rsquo;lmaydi — asl summa {money.uzs(natural)}
+        </p>
+      ) : isNatural ? (
+        <p className="text-caption text-text-tertiary">
+          Asl summa — narx o&rsquo;zgarmaydi
         </p>
       ) : (
-        discount > 0 && (
+        !empty && (
           <p className="text-caption text-primary-dark tabular">
-            −{discount}% chegirma · {money.uzs(catalogPrice - unit)} / dona
-            {paid > 1 && ` · jami −${money.uzs((catalogPrice - unit) * paid)}`}
+            −{discount}% chegirma · jami −{money.uzs(natural - total)}
+            {unevenSplit && ` · 1 dona ≈ ${money.uzs(spreadUnit)}`}
           </p>
         )
       )}
@@ -243,7 +274,7 @@ function PriceForm({
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => changeUnit(Math.round((catalogPrice * (100 - off)) / 100))}
+            onClick={() => changeTotal(Math.round((natural * (100 - off)) / 100))}
           >
             −{off}%
           </Button>
@@ -266,7 +297,7 @@ function PriceForm({
         <Button type="button" variant="outline" onClick={onCancel}>
           Bekor
         </Button>
-        <Button type="button" onClick={commit} disabled={invalid}>
+        <Button type="button" onClick={commit} disabled={tooHigh || empty}>
           Qo&rsquo;llash
         </Button>
       </div>
