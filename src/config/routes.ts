@@ -13,6 +13,7 @@ export const AppRoutes = {
   appointments: "/appointments",
   clients: "/clients",
   orders: "/orders",
+  incomingOrders: "/incoming-orders",
   returns: "/returns",
   treatments: "/treatments",
   debts: "/debts",
@@ -35,6 +36,7 @@ export type NavIcon =
   | "calendarCheck"
   | "users"
   | "receipt"
+  | "inbox"
   | "undo"
   | "activity"
   | "creditCard"
@@ -102,6 +104,12 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "Buyurtmalar",
         subtitle: "Barcha buyurtmalar tarixi",
         icon: "receipt",
+      },
+      {
+        path: AppRoutes.incomingOrders,
+        label: "Doctor Ali app",
+        subtitle: "Doctor Ali ilovasidan kelgan buyurtmalar",
+        icon: "inbox",
       },
       {
         path: AppRoutes.returns,

@@ -104,6 +104,15 @@ export const endpoints = {
   /** The same payload the create response carries, so a reprint keeps its number. */
   orderReceipt: (id: string) => `orders/${id}/receipt/`,
 
+  // --- Incoming orders (app + doctor, READ-ONLY) -----------------------------
+  // Status changes are the logist/operator panel's job — audit, commission and
+  // notifications travel in one chain there, so this section must never grow a
+  // write call.
+  incomingOrders: "incoming-orders/",
+  incomingOrdersSummary: "incoming-orders/summary/",
+  incomingOrdersFilters: "incoming-orders/filters/",
+  incomingOrder: (id: string) => `incoming-orders/${id}/`,
+
   // --- Returns ---------------------------------------------------------------
   returns: "returns/",
   /** PATCH only, and only `reason` — the money and the lines are immutable. */
