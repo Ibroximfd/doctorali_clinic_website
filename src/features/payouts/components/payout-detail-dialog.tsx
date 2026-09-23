@@ -2,6 +2,7 @@
 
 import { Ban } from "lucide-react";
 
+import { CommissionBreakdownLine } from "@/shared/components/data-display/commission-breakdown-line";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -84,6 +85,10 @@ export function PayoutDetailDialog({
               <p className="text-display-sm tabular mt-1">
                 {money.plain(data.totalAmount)}
               </p>
+              <CommissionBreakdownLine
+                breakdown={data.commissionBreakdown}
+                className="mt-1.5"
+              />
               <dl className="text-caption text-text-tertiary mt-2 flex flex-col gap-0.5">
                 {data.paidAt && (
                   <div className="flex gap-2">

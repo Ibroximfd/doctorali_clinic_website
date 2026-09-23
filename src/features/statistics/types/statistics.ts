@@ -1,4 +1,6 @@
 import type { OrderSummary } from "@/features/orders/types/order";
+import type { PayoutDay } from "@/features/payouts/types/payout";
+import type { CommissionBreakdown } from "@/shared/domain/commission-breakdown";
 import type { PaymentType } from "@/shared/domain/payment-type";
 
 /** Headline KPI figures (dashboard totals, or one doctor's totals). */
@@ -48,6 +50,38 @@ export interface ProductStat {
   readonly packaging: Packaging;
 }
 
+/**
+ * Orders the doctor earned on that were NOT rung up at the desk: the client
+ * ordered in the app on their recommendation, or the doctor placed the order
+ * from their own app.
+ *
+ * The two figures behave differently on purpose, and mixing them up is how a
+ * day's takings get overstated:
+ * - `commission` **is already inside** `commissionEarned` — the clinic owes it.
+ * - `revenue` is **not** inside `revenue` — that money never passed the till.
+ *
+ * The backend only counts these from a cutoff date onwards, so an older period
+ * reports zeros here. That is the intended answer, not a gap.
+ */
+export interface AppOrderStats {
+  readonly ordersCount: number;
+  readonly unitsSold: number;
+  readonly revenue: number;
+  readonly commission: number;
+}
+
+export const ZERO_APP_ORDERS: AppOrderStats = {
+  ordersCount: 0,
+  unitsSold: 0,
+  revenue: 0,
+  commission: 0,
+};
+
+/** Whether this period has anything to say about app orders at all. */
+export function hasAppOrders(stats: AppOrderStats): boolean {
+  return stats.ordersCount > 0 || stats.commission !== 0;
+}
+
 /** Per-doctor sales aggregate (statistics/doctors list). */
 export interface DoctorStat {
   readonly doctorId: string;
@@ -56,8 +90,19 @@ export interface DoctorStat {
   readonly commissionPercent: number;
   readonly ordersCount: number;
   readonly unitsSold: number;
+  /** Desk sales only; app orders are reported apart, in {@link appOrders}. */
   readonly revenue: number;
+  /** Product commission only — services are counted separately. */
   readonly commissionEarned: number;
+  readonly appOrders: AppOrderStats;
+  /** Products **and** services: what the doctor actually earned this period. */
+  readonly totalCommission: number;
+  /**
+   * `adjustments` is always 0 here: statistics report the shop's sales, and
+   * corrections have never been counted in them. The payouts screens are where
+   * a correction shows up.
+   */
+  readonly commissionBreakdown: CommissionBreakdown | null;
   readonly avatarUrl: string | null;
 }
 
@@ -236,6 +281,15 @@ export interface DoctorDetailStats {
   readonly commissionPercent: number;
   readonly avatarUrl: string | null;
   readonly kpis: KpiStats;
+  readonly commissionBreakdown: CommissionBreakdown | null;
+  readonly appOrders: AppOrderStats;
+  /** Desk sales only, by revenue — app orders are not part of this. */
   readonly productsBreakdown: readonly ProductStat[];
   readonly commissionChart: readonly ChartPoint[];
+  /**
+   * The period opened day → order → product, in the same shape the payouts
+   * screens use. The backend guarantees the days add up to `totalCommission`,
+   * so this is the receipt behind the headline figure.
+   */
+  readonly days: readonly PayoutDay[];
 }

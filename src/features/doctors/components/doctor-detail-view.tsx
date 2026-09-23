@@ -4,8 +4,10 @@ import {
   ArrowLeft,
   BriefcaseMedical,
   DollarSign,
+  History,
   Package,
   ShoppingCart,
+  Smartphone,
   TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
@@ -21,12 +23,14 @@ import {
 } from "recharts";
 
 import { AppRoutes } from "@/config/routes";
+import { PayoutBreakdown } from "@/features/payouts/components/payout-breakdown";
 import type { StatsQuery } from "@/features/statistics/api/statistics-api";
 import { useDoctorDetailQuery } from "@/features/statistics/hooks/use-dashboard";
 import {
   buildChartSamples,
   type ChartSample,
 } from "@/features/statistics/lib/chart-series";
+import { hasAppOrders, type AppOrderStats } from "@/features/statistics/types/statistics";
 import { AppCard } from "@/shared/components/data-display/app-card";
 import { PageContainer } from "@/shared/components/data-display/page-container";
 import { DateFilter } from "@/shared/components/data-display/date-filter";
@@ -37,6 +41,7 @@ import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { AppAvatar } from "@/shared/components/ui/app-avatar";
 import { Skeleton } from "@/shared/components/ui/skeleton";
+import { breakdownHint } from "@/shared/domain/commission-breakdown";
 import type { DateRange } from "@/shared/domain/date-range";
 import { periodForRange, resolveRange } from "@/shared/domain/date-range";
 import { formatUnits } from "@/shared/domain/packaging";
@@ -136,19 +141,30 @@ export function DoctorDetailView({ doctorId }: { doctorId: string }) {
               icon={Package}
               tone="neutral"
             />
+            {/* Desk takings only. App orders are billed elsewhere, so the
+                hint names them instead of letting the figure read as "all the
+                money this doctor brought in". */}
             <StatCard
               label="Savdo"
               value={money.plain(data.kpis.totalRevenue)}
               icon={DollarSign}
               tone="primary"
+              hint={
+                data.appOrders.revenue > 0
+                  ? `Ilovadan yana ${money.plain(data.appOrders.revenue)}`
+                  : undefined
+              }
             />
             <StatCard
-              label="Komissiya"
+              label="Jami komissiya"
               value={money.plain(data.kpis.totalCommission)}
               icon={TrendingUp}
               tone="gold"
+              hint={breakdownHint(data.commissionBreakdown)}
             />
           </div>
+
+          {hasAppOrders(data.appOrders) && <AppOrdersCard stats={data.appOrders} />}
 
           <AppCard>
             <SectionHeader
@@ -250,8 +266,74 @@ export function DoctorDetailView({ doctorId }: { doctorId: string }) {
               </ul>
             )}
           </AppCard>
+
+          {/* The receipt behind the headline: the same day → order → product
+              drill-down the payouts screens show, so a doctor disputing a
+              figure is answered from one place. */}
+          <AppCard>
+            <SectionHeader
+              icon={History}
+              title="Tarix"
+              subtitle="Kun · buyurtma · muolaja kesimida"
+            />
+            {data.days.length === 0 ? (
+              <EmptyState
+                title="Ma'lumot yo'q"
+                message="Bu davrda komissiya hisoblanmagan."
+              />
+            ) : (
+              <div className="mt-4">
+                <PayoutBreakdown days={data.days} />
+              </div>
+            )}
+          </AppCard>
         </div>
       )}
     </PageContainer>
+  );
+}
+
+/**
+ * Orders that came in through an app rather than the desk.
+ *
+ * Deliberately a separate card, not a fifth KPI tile: its revenue must NOT be
+ * added to the period's takings (it never passed the till), while its
+ * commission already is inside the commission figure above. Two figures that
+ * behave differently need the sentence that says so.
+ */
+function AppOrdersCard({ stats }: { stats: AppOrderStats }) {
+  return (
+    <AppCard className="flex flex-wrap items-center gap-x-6 gap-y-3">
+      <span className="bg-info/12 flex rounded-[8px] p-2" aria-hidden>
+        <Smartphone className="text-info size-[18px]" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-title-sm">Ilova buyurtmalari</p>
+        <p className="text-caption text-text-secondary">
+          Mijoz ilovadan yoki shifokor o&rsquo;zi bergan buyurtmalar — savdoga
+          qo&rsquo;shilmaydi, komissiyasi esa yuqoridagi jamiga kirgan.
+        </p>
+      </div>
+      <dl className="flex flex-wrap items-center justify-end gap-x-6 gap-y-2">
+        <div className="text-right">
+          <dt className="text-caption text-text-tertiary">Buyurtma</dt>
+          <dd className="text-title-sm tabular">{stats.ordersCount} ta</dd>
+        </div>
+        <div className="text-right">
+          <dt className="text-caption text-text-tertiary">Dona</dt>
+          <dd className="text-title-sm tabular">{stats.unitsSold}</dd>
+        </div>
+        <div className="text-right">
+          <dt className="text-caption text-text-tertiary">Savdo</dt>
+          <dd className="text-title-sm tabular">{money.plain(stats.revenue)}</dd>
+        </div>
+        <div className="text-right">
+          <dt className="text-caption text-text-tertiary">Komissiya</dt>
+          <dd className="text-title-sm text-primary-dark tabular">
+            {money.plain(stats.commission)}
+          </dd>
+        </div>
+      </dl>
+    </AppCard>
   );
 }

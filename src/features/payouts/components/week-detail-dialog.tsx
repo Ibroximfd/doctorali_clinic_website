@@ -1,8 +1,9 @@
 "use client";
 
-import { HandCoins, TriangleAlert } from "lucide-react";
+import { CircleCheck, HandCoins, Hourglass, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
+import { CommissionBreakdownLine } from "@/shared/components/data-display/commission-breakdown-line";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -16,12 +17,17 @@ import {
 import { Label } from "@/shared/components/ui/label";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { Textarea } from "@/shared/components/ui/textarea";
-import { dayMonth, dayMonthYear } from "@/shared/lib/format/date";
+import { dayMonth, dayMonthYear, dayMonthYearTime } from "@/shared/lib/format/date";
 import { money } from "@/shared/lib/format/money";
 import { cn } from "@/shared/lib/utils";
 
 import { usePayWeek, useWeekDetailQuery } from "../hooks/use-payouts";
-import { balanceCaption, balanceExplanation, balanceOf } from "../types/payout";
+import {
+  balanceCaption,
+  balanceExplanation,
+  balanceOf,
+  type WeekDetail,
+} from "../types/payout";
 import { PayoutBreakdown } from "./payout-breakdown";
 
 /**
@@ -31,6 +37,10 @@ import { PayoutBreakdown } from "./payout-breakdown";
  * because a week that comes out lower than the doctor expects is almost always
  * a correction from an earlier week — and that is the conversation this dialog
  * exists to settle.
+ *
+ * The week still being earned in (`is_current`) is readable but not payable:
+ * its figure is not final until Sunday is over, and the backend refuses the
+ * payment anyway — so the button is not offered in the first place.
  */
 export function WeekDetailDialog({
   doctorId,
@@ -52,6 +62,7 @@ export function WeekDetailDialog({
 
   const balance = data ? balanceOf(data.totalAmount) : "settled";
   const explanation = balanceExplanation(balance);
+  const canPay = data !== undefined && !data.isPaid && !data.isCurrent;
 
   async function submit() {
     if (!data || doctorId === null || weekStart === null) return;
@@ -94,17 +105,22 @@ export function WeekDetailDialog({
               >
                 {money.plain(Math.abs(data.totalAmount))}
               </p>
+              <CommissionBreakdownLine
+                breakdown={data.commissionBreakdown}
+                className="mt-1.5"
+              />
               {explanation && (
                 <p className="text-caption text-warning mt-2 flex items-start gap-2">
                   <TriangleAlert className="mt-px size-4 shrink-0" aria-hidden />
                   {explanation}
                 </p>
               )}
+              <WeekStatusNote week={data} />
             </div>
 
             <PayoutBreakdown days={data.days} />
 
-            {!data.isPaid && (
+            {canPay && (
               <div className="space-y-1.5">
                 <Label htmlFor="payout-note">Izoh</Label>
                 <Textarea
@@ -123,7 +139,7 @@ export function WeekDetailDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Yopish
           </Button>
-          {data && !data.isPaid && (
+          {canPay && (
             <Button onClick={submit} disabled={pay.isPending}>
               {pay.isPending ? (
                 <span
@@ -139,5 +155,37 @@ export function WeekDetailDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * What can be done with this week, in words — because the absence of a button
+ * is not an explanation. A week is either still filling up, already settled, or
+ * waiting to be paid; only the last one needs no sentence.
+ */
+function WeekStatusNote({ week }: { week: WeekDetail }) {
+  if (week.isCurrent) {
+    return (
+      <p className="text-caption text-text-secondary mt-2 flex items-start gap-2">
+        <Hourglass className="mt-px size-4 shrink-0" aria-hidden />
+        Joriy hafta — hisoblanmoqda. Yakshanba tugagach to&rsquo;lash mumkin
+        bo&rsquo;ladi.
+      </p>
+    );
+  }
+
+  if (!week.isPaid) return null;
+
+  const payout = week.payout;
+  return (
+    <p className="text-caption text-primary-dark mt-2 flex items-start gap-2">
+      <CircleCheck className="mt-px size-4 shrink-0" aria-hidden />
+      <span>
+        To&rsquo;langan
+        {payout?.paidAt && ` · ${dayMonthYearTime(payout.paidAt)}`}
+        {payout?.paidByName ? ` · ${payout.paidByName}` : ""}
+        {payout?.note ? ` · ${payout.note}` : ""}
+      </span>
+    </p>
   );
 }

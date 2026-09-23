@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { DoctorFilter } from "@/features/doctors/components/doctor-filter";
 import { AppCard } from "@/shared/components/data-display/app-card";
 import { ActiveFilters } from "@/shared/components/data-display/active-filters";
+import { CommissionBreakdownLine } from "@/shared/components/data-display/commission-breakdown-line";
 import { DateFilter } from "@/shared/components/data-display/date-filter";
 import { FilterBar, FilterSelect } from "@/shared/components/data-display/filter-bar";
 import { ListSkeleton } from "@/shared/components/data-display/list-skeleton";
@@ -155,13 +156,19 @@ export function PayoutsView() {
             </AppCard>
           ) : (
             <>
-              <AppCard className="flex items-baseline gap-3">
-                <span className="text-label text-text-secondary flex-1">
-                  Jami to&rsquo;lanmagan
-                </span>
-                <span className="text-display-sm tabular">
-                  {money.plain(outstanding.data.grandTotal)}
-                </span>
+              <AppCard>
+                <div className="flex items-baseline gap-3">
+                  <span className="text-label text-text-secondary flex-1">
+                    Jami to&rsquo;lanmagan
+                  </span>
+                  <span className="text-display-sm tabular">
+                    {money.plain(outstanding.data.grandTotal)}
+                  </span>
+                </div>
+                <CommissionBreakdownLine
+                  breakdown={outstanding.data.grandBreakdown}
+                  className="mt-1 justify-end"
+                />
               </AppCard>
 
               <div className="flex flex-col gap-4">
@@ -175,6 +182,10 @@ export function PayoutsView() {
                           {money.plain(entry.totalUnpaid)}
                         </span>
                       }
+                    />
+                    <CommissionBreakdownLine
+                      breakdown={entry.commissionBreakdown}
+                      className="mt-1 justify-end"
                     />
                     <ul className="mt-4 flex flex-col gap-2">
                       {entry.weeks.map((w) => {
@@ -202,6 +213,10 @@ export function PayoutsView() {
                                 <span className="text-caption text-text-tertiary block">
                                   {w.commissionCount} ta komissiya
                                 </span>
+                                <CommissionBreakdownLine
+                                  breakdown={w.commissionBreakdown}
+                                  className="mt-0.5"
+                                />
                               </span>
                               <span
                                 className={cn(
@@ -308,6 +323,10 @@ export function PayoutsView() {
                             {dayMonth(payout.weekStart)} – {dayMonthYear(payout.weekEnd)}
                             {payout.paidByName && ` · ${payout.paidByName}`}
                           </p>
+                          <CommissionBreakdownLine
+                            breakdown={payout.commissionBreakdown}
+                            className="mt-0.5"
+                          />
                         </div>
                         <span
                           className={cn(

@@ -14,6 +14,10 @@ import { PAYOUT_SOURCE_LABEL, type PayoutDay } from "../types/payout";
  * they are the same question asked at two moments: "where did this figure come
  * from?" — and the answer must read identically either way.
  *
+ * A day is read in three groups — orders, procedures, corrections — because the
+ * three earn at different percentages and a doctor asking "why is this figure
+ * what it is?" is always asking about one of them in particular.
+ *
  * The corrections (`adjustments`) sit inline with the day they land on: a week
  * that comes out lower than the doctor expects is almost always a correction
  * from an earlier week, and that is the conversation this exists to settle.
@@ -59,6 +63,27 @@ export function PayoutBreakdown({ days }: { days: readonly PayoutDay[] }) {
                   </li>
                 ))}
               </ul>
+            </div>
+          ))}
+
+          {day.treatments.map((treatment) => (
+            <div
+              key={treatment.treatmentId}
+              className="border-surface-alt mt-2 border-t pt-2"
+            >
+              <div className="flex items-baseline gap-2">
+                <span className="text-caption text-text-secondary truncate">
+                  {treatment.kindDisplay}
+                  {treatment.description !== "" && ` · ${treatment.description}`}
+                </span>
+                <span className="text-caption tabular ml-auto shrink-0">
+                  {percent.labeled(treatment.commissionPercent)} ·{" "}
+                  {money.plain(treatment.commissionAmount)}
+                </span>
+              </div>
+              <p className="text-caption text-text-tertiary tabular mt-0.5">
+                {treatment.kindDisplay} summasi {money.plain(treatment.amount)}
+              </p>
             </div>
           ))}
 

@@ -1,4 +1,8 @@
 import {
+  parseCommissionBreakdown,
+  type CommissionBreakdown,
+} from "@/shared/domain/commission-breakdown";
+import {
   dateFromYmd,
   maybeTashkentFromApi,
   tashkentFromApi,
@@ -15,11 +19,12 @@ export interface PayoutDoctor {
 }
 
 /** Where a commission originated. */
-export type PayoutSource = "reception" | "doctor" | "unknown";
+export type PayoutSource = "reception" | "doctor" | "mehrigiyo" | "unknown";
 
 export const PAYOUT_SOURCE_LABEL: Readonly<Record<PayoutSource, string>> = {
   reception: "Showroom",
-  doctor: "Ilova",
+  doctor: "Shifokor",
+  mehrigiyo: "Ilova",
   unknown: "—",
 };
 
@@ -95,11 +100,32 @@ export interface PayoutAdjustment {
   readonly at: TashkentDate | null;
 }
 
+/** Which service was billed, and therefore which percentage applied. */
+export type PayoutTreatmentKind = "treatment" | "consultation";
+
+/**
+ * One procedure or consultation within a payout day.
+ *
+ * Services earn at their own percentage — a procedure can pay 40% where goods
+ * pay 5% — so they are listed apart from the orders rather than folded in.
+ */
+export interface PayoutTreatment {
+  readonly treatmentId: string;
+  readonly kind: PayoutTreatmentKind;
+  /** Ready to print; the backend owns the wording. */
+  readonly kindDisplay: string;
+  readonly description: string;
+  readonly amount: number;
+  readonly commissionAmount: number;
+  readonly commissionPercent: number;
+}
+
 /** One calendar day of a payout week. */
 export interface PayoutDay {
   readonly date: TashkentDate;
   readonly dayCommission: number;
   readonly orders: readonly PayoutOrder[];
+  readonly treatments: readonly PayoutTreatment[];
   readonly adjustments: readonly PayoutAdjustment[];
 }
 
@@ -109,6 +135,7 @@ export interface OutstandingWeek {
   readonly weekEnd: TashkentDate;
   readonly totalAmount: number;
   readonly commissionCount: number;
+  readonly commissionBreakdown: CommissionBreakdown | null;
 }
 
 /** The `YYYY-MM-DD` Monday string the pay/week endpoints expect. */
@@ -121,11 +148,13 @@ export interface OutstandingDoctor {
   readonly totalUnpaid: number;
   readonly weeksCount: number;
   readonly weeks: readonly OutstandingWeek[];
+  readonly commissionBreakdown: CommissionBreakdown | null;
 }
 
 export interface OutstandingResponse {
   readonly doctors: readonly OutstandingDoctor[];
   readonly grandTotal: number;
+  readonly grandBreakdown: CommissionBreakdown | null;
 }
 
 /** Everything sold in one week for a doctor, opened day → order → product. */
@@ -135,8 +164,17 @@ export interface WeekDetail {
   readonly weekEnd: TashkentDate;
   readonly totalAmount: number;
   readonly commissionCount: number;
+  readonly commissionBreakdown: CommissionBreakdown | null;
   readonly isPaid: boolean;
   readonly payoutId: string | null;
+  /**
+   * The week money is still being earned in. It cannot be paid out — the figure
+   * is not final until Sunday is over — so the screens name it instead of
+   * offering a button that the backend would refuse.
+   */
+  readonly isCurrent: boolean;
+  /** The payout itself once the week was settled; null while it is open. */
+  readonly payout: Payout | null;
   readonly days: readonly PayoutDay[];
 }
 
@@ -148,6 +186,7 @@ export interface Payout {
   readonly weekEnd: TashkentDate;
   readonly totalAmount: number;
   readonly commissionCount: number;
+  readonly commissionBreakdown: CommissionBreakdown | null;
   readonly status: PayoutStatus;
   readonly note: string;
   readonly createdAt: TashkentDate;
@@ -182,7 +221,7 @@ export function parsePayoutDoctor(raw: unknown): PayoutDoctor {
 }
 
 function parsePayoutSource(raw: unknown): PayoutSource {
-  return raw === "reception" || raw === "doctor" ? raw : "unknown";
+  return raw === "reception" || raw === "doctor" || raw === "mehrigiyo" ? raw : "unknown";
 }
 
 function parsePayoutItem(raw: unknown): PayoutItem {
@@ -206,6 +245,23 @@ function parsePayoutOrder(raw: unknown): PayoutOrder {
     createdAt: tashkentFromApi(str(o.created_at)),
     orderCommission: num(o.order_commission),
     items: Array.isArray(o.items) ? o.items.map(parsePayoutItem) : [],
+  };
+}
+
+function parsePayoutTreatment(raw: unknown): PayoutTreatment {
+  const t = isRecord(raw) ? raw : {};
+  const kind = t.kind === "consultation" ? "consultation" : "treatment";
+  return {
+    treatmentId: str(t.treatment_id),
+    kind,
+    kindDisplay: str(
+      t.kind_display,
+      kind === "consultation" ? "Konsultatsiya" : "Muolaja",
+    ),
+    description: str(t.description),
+    amount: num(t.amount),
+    commissionAmount: num(t.commission_amount),
+    commissionPercent: num(t.commission_percent),
   };
 }
 
@@ -247,6 +303,7 @@ export function parsePayoutDay(raw: unknown): PayoutDay {
     date: dateFromYmd(str(d.date)),
     dayCommission: num(d.day_commission),
     orders: Array.isArray(d.orders) ? d.orders.map(parsePayoutOrder) : [],
+    treatments: Array.isArray(d.treatments) ? d.treatments.map(parsePayoutTreatment) : [],
     adjustments: Array.isArray(d.adjustments)
       ? d.adjustments.map(parsePayoutAdjustment)
       : [],
@@ -257,6 +314,7 @@ export function parseOutstanding(raw: unknown): OutstandingResponse {
   const r = isRecord(raw) ? raw : {};
   return {
     grandTotal: num(r.grand_total),
+    grandBreakdown: parseCommissionBreakdown(r.grand_breakdown),
     doctors: Array.isArray(r.doctors)
       ? r.doctors.map((entry) => {
           const d = isRecord(entry) ? entry : {};
@@ -264,6 +322,7 @@ export function parseOutstanding(raw: unknown): OutstandingResponse {
             doctor: parsePayoutDoctor(d.doctor),
             totalUnpaid: num(d.total_unpaid),
             weeksCount: num(d.weeks_count),
+            commissionBreakdown: parseCommissionBreakdown(d.commission_breakdown),
             weeks: Array.isArray(d.weeks)
               ? d.weeks.map((w) => {
                   const week = isRecord(w) ? w : {};
@@ -272,6 +331,9 @@ export function parseOutstanding(raw: unknown): OutstandingResponse {
                     weekEnd: dateFromYmd(str(week.week_end)),
                     totalAmount: num(week.total_amount),
                     commissionCount: num(week.commission_count),
+                    commissionBreakdown: parseCommissionBreakdown(
+                      week.commission_breakdown,
+                    ),
                   };
                 })
               : [],
@@ -289,9 +351,12 @@ export function parseWeekDetail(raw: unknown): WeekDetail {
     weekEnd: dateFromYmd(str(w.week_end)),
     totalAmount: num(w.total_amount),
     commissionCount: num(w.commission_count),
+    commissionBreakdown: parseCommissionBreakdown(w.commission_breakdown),
     isPaid: w.is_paid === true,
     payoutId:
       w.payout_id === null || w.payout_id === undefined ? null : String(w.payout_id),
+    isCurrent: w.is_current === true,
+    payout: isRecord(w.payout) ? parsePayout(w.payout) : null,
     days: Array.isArray(w.days) ? w.days.map(parsePayoutDay) : [],
   };
 }
@@ -307,6 +372,7 @@ export function parsePayout(raw: unknown): Payout {
     weekEnd: dateFromYmd(str(p.week_end)),
     totalAmount: num(p.total_amount),
     commissionCount: num(p.commission_count),
+    commissionBreakdown: parseCommissionBreakdown(p.commission_breakdown),
     status,
     note: str(p.note),
     createdAt: tashkentFromApi(str(p.created_at)),

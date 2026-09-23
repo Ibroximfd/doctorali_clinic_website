@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import { doctorDetailPath } from "@/config/routes";
 import type { StatsQuery } from "@/features/statistics/api/statistics-api";
 import { useDoctorStatsQuery } from "@/features/statistics/hooks/use-dashboard";
-import type { DoctorStat } from "@/features/statistics/types/statistics";
+import { hasAppOrders, type DoctorStat } from "@/features/statistics/types/statistics";
 import { AppCard } from "@/shared/components/data-display/app-card";
 import { ListSkeleton } from "@/shared/components/data-display/list-skeleton";
 import { PageContainer } from "@/shared/components/data-display/page-container";
@@ -22,6 +22,7 @@ import { AppAvatar } from "@/shared/components/ui/app-avatar";
 import type { DateRange } from "@/shared/domain/date-range";
 import { periodForRange, resolveRange } from "@/shared/domain/date-range";
 import { rangeLabel } from "@/shared/domain/date-range-label";
+import { breakdownHint } from "@/shared/domain/commission-breakdown";
 import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
 import { money } from "@/shared/lib/format/money";
 import { percent } from "@/shared/lib/format/percent";
@@ -31,6 +32,7 @@ const ORDERINGS = [
   { value: "-commission_earned", label: "Ko'p komissiya" },
   { value: "-orders_count", label: "Ko'p buyurtma" },
   { value: "-units_sold", label: "Ko'p dona" },
+  { value: "-app_commission", label: "Ko'p ilova komissiyasi" },
 ] as const;
 
 const PAGE_SIZE = 20;
@@ -137,6 +139,8 @@ export function DoctorsView() {
 }
 
 function DoctorRow({ doctor }: { doctor: DoctorStat }) {
+  const hint = breakdownHint(doctor.commissionBreakdown);
+
   return (
     <Link
       href={doctorDetailPath(doctor.doctorId)}
@@ -161,18 +165,40 @@ function DoctorRow({ doctor }: { doctor: DoctorStat }) {
         <p className="text-title-sm tabular">{doctor.unitsSold}</p>
       </div>
 
+      {/* Desk sales only — app orders never reached the till, so they are
+          reported in their own column rather than folded into this one. */}
       <div className="w-32 text-right">
         <p className="text-caption text-text-tertiary">Savdo</p>
         <p className="text-title-sm tabular">{money.plain(doctor.revenue)}</p>
       </div>
 
-      <div className="w-32 text-right">
+      <div className="hidden w-28 text-right lg:block">
+        <p className="text-caption text-text-tertiary">Ilova</p>
+        {hasAppOrders(doctor.appOrders) ? (
+          <>
+            <p className="text-title-sm tabular">{doctor.appOrders.ordersCount} ta</p>
+            <p className="text-caption text-text-tertiary tabular">
+              {money.plain(doctor.appOrders.commission)}
+            </p>
+          </>
+        ) : (
+          <p className="text-title-sm text-text-tertiary">&mdash;</p>
+        )}
+      </div>
+
+      {/* Products AND services: the figure the doctor is actually owed. */}
+      <div className="w-32 text-right lg:w-44">
         <p className="text-caption text-text-tertiary">
           Komissiya · {percent.labeled(doctor.commissionPercent)}
         </p>
         <p className="text-title-sm text-primary-dark tabular">
-          {money.plain(doctor.commissionEarned)}
+          {money.plain(doctor.totalCommission)}
         </p>
+        {hint && (
+          <p className="text-caption text-text-tertiary hidden truncate lg:block">
+            {hint}
+          </p>
+        )}
       </div>
 
       <ChevronRight className="text-text-tertiary size-4 shrink-0" aria-hidden />

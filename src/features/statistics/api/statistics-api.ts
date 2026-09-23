@@ -1,4 +1,6 @@
 import { parseOrderSummary } from "@/features/orders/types/order";
+import { parsePayoutDay } from "@/features/payouts/types/payout";
+import { parseCommissionBreakdown } from "@/shared/domain/commission-breakdown";
 import { parsePackaging } from "@/shared/domain/packaging";
 import {
   resolveRange,
@@ -16,6 +18,7 @@ import { http, type Query } from "@/shared/lib/api/http";
 import { parsePaginated, type Paginated } from "@/shared/lib/api/pagination";
 
 import type {
+  AppOrderStats,
   ChartPoint,
   DashboardStats,
   DoctorDetailStats,
@@ -122,8 +125,23 @@ export function parseProductStat(raw: unknown): ProductStat {
   };
 }
 
+/**
+ * The `app_*` block. All four keys are absent on a server that predates the
+ * feature, and zero for a period before the backend's cutoff date — both read
+ * the same way here, as "nothing from the app in this period".
+ */
+function parseAppOrders(raw: Record<string, unknown>): AppOrderStats {
+  return {
+    ordersCount: num(raw.app_orders_count),
+    unitsSold: num(raw.app_units_sold),
+    revenue: num(raw.app_revenue),
+    commission: num(raw.app_commission),
+  };
+}
+
 export function parseDoctorStat(raw: unknown): DoctorStat {
   const d = (raw ?? {}) as Record<string, unknown>;
+  const commissionEarned = num(d.commission_earned);
   return {
     doctorId: str(d.doctor_id),
     fullName: str(d.full_name),
@@ -132,7 +150,12 @@ export function parseDoctorStat(raw: unknown): DoctorStat {
     ordersCount: num(d.orders_count),
     unitsSold: num(d.units_sold),
     revenue: num(d.revenue),
-    commissionEarned: num(d.commission_earned),
+    commissionEarned,
+    appOrders: parseAppOrders(d),
+    // A doctor with no services earns product commission only, which is what
+    // older payloads sent as the whole story.
+    totalCommission: num(d.total_commission, commissionEarned),
+    commissionBreakdown: parseCommissionBreakdown(d.commission_breakdown),
     avatarUrl: typeof d.avatar_url === "string" ? d.avatar_url : null,
   };
 }
@@ -350,12 +373,15 @@ export async function fetchDoctorDetail(input: {
       totalOrders: num(raw.orders_count),
       totalUnits: num(raw.units_sold),
       totalRevenue: num(raw.revenue),
-      totalCommission: num(raw.commission_earned),
+      totalCommission: num(raw.total_commission, num(raw.commission_earned)),
     },
+    commissionBreakdown: parseCommissionBreakdown(raw.commission_breakdown),
+    appOrders: parseAppOrders(raw),
     productsBreakdown: Array.isArray(raw.products_breakdown)
       ? raw.products_breakdown.map(parseProductStat)
       : [],
     commissionChart: parseChartPoints(raw.commission_chart, "commission"),
+    days: Array.isArray(raw.days) ? raw.days.map(parsePayoutDay) : [],
   };
 }
 
