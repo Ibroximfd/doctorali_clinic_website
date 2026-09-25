@@ -102,6 +102,12 @@ export function PayoutDetailDialog({
                     <dd className="ml-auto">{data.paidByName}</dd>
                   </div>
                 )}
+                {data.filial && (
+                  <div className="flex gap-2">
+                    <dt>Kassa</dt>
+                    <dd className="ml-auto">{data.filial.name}</dd>
+                  </div>
+                )}
                 {data.note !== "" && (
                   <div className="flex gap-2">
                     <dt>Izoh</dt>

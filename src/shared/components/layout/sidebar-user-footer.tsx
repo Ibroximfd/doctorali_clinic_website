@@ -55,6 +55,7 @@ export function SidebarUserFooter({ collapsed }: { collapsed: boolean }) {
           <p className="text-title-sm truncate">{name}</p>
           <p className="text-caption text-text-tertiary truncate">
             {user?.isAdmin ? "Administrator" : "Qabulxona"}
+            {user?.filial && ` · ${user.filial.name}`}
           </p>
         </div>
         <ThemeToggle className="text-text-secondary" />

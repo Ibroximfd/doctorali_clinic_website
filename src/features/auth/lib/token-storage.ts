@@ -124,7 +124,9 @@ export const tokenStorage = {
     const raw = memUser ?? safeGet(K_USER);
     if (!raw) return null;
     try {
-      return JSON.parse(raw) as AuthUser;
+      const user = JSON.parse(raw) as AuthUser;
+      // A user cached before branches existed has no `filial` key at all.
+      return { ...user, filial: user.filial ?? null };
     } catch {
       return null;
     }

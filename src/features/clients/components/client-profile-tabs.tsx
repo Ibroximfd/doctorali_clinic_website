@@ -13,6 +13,7 @@ import { OrderReturnDialog } from "@/features/returns/components/order-return-di
 import type { OrderDetail } from "@/features/orders/types/order";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { ErrorState } from "@/shared/components/feedback/error-state";
+import { FilialTag } from "@/shared/components/data-display/filial-tag";
 import { PaginationBar } from "@/shared/components/data-display/pagination-bar";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { dayMonthYear, shortDate, shortDateTime } from "@/shared/lib/format/date";
@@ -215,6 +216,7 @@ function VisitsTab({ clientId }: { clientId: number }) {
               {visit.doctor && ` · ${visit.doctor.fullName}`}
             </span>
           </span>
+          <FilialTag filial={visit.filial} />
           <AppointmentStatusChip
             status={visit.status}
             statusDisplay={visit.statusDisplay}
@@ -260,6 +262,7 @@ function OrdersTab({ clientId }: { clientId: number }) {
                 {order.doctorName !== "" && ` · ${order.doctorName}`}
               </span>
             </span>
+            <FilialTag filial={order.filial} />
             <span
               className={cn(
                 "text-title-sm tabular shrink-0",
@@ -322,6 +325,7 @@ function TreatmentsTab({ clientId }: { clientId: number }) {
               {treatment.doctor && ` · ${treatment.doctor.fullName}`}
             </span>
           </span>
+          <FilialTag filial={treatment.filial} />
           <span
             className={cn(
               "text-title-sm tabular shrink-0",
@@ -360,6 +364,7 @@ function DebtsTab({ clientId }: { clientId: number }) {
               {debt.sourceDisplay !== "" && ` · ${debt.sourceDisplay}`}
             </span>
           </span>
+          <FilialTag filial={debt.filial} />
           <DebtStatusBadge debt={debt} />
         </div>
       )}
@@ -380,9 +385,12 @@ function NotesTab({ clientId }: { clientId: number }) {
       renderRow={(note) => (
         <div>
           <p className="text-body-sm break-words">{note.text}</p>
-          <p className="text-caption text-text-tertiary tabular">
-            {shortDate(note.createdAt)}
-            {note.author !== "" && ` · ${note.author}`}
+          <p className="text-caption text-text-tertiary tabular flex flex-wrap items-center gap-x-2">
+            <span>
+              {shortDate(note.createdAt)}
+              {note.author !== "" && ` · ${note.author}`}
+            </span>
+            <FilialTag filial={note.filial} />
           </p>
         </div>
       )}

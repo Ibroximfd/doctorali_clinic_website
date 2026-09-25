@@ -8,6 +8,7 @@ import { AppCard } from "@/shared/components/data-display/app-card";
 import { ActiveFilters } from "@/shared/components/data-display/active-filters";
 import { CommissionBreakdownLine } from "@/shared/components/data-display/commission-breakdown-line";
 import { DateFilter } from "@/shared/components/data-display/date-filter";
+import { FilialTag } from "@/shared/components/data-display/filial-tag";
 import { FilterBar, FilterSelect } from "@/shared/components/data-display/filter-bar";
 import { ListSkeleton } from "@/shared/components/data-display/list-skeleton";
 import { PageContainer } from "@/shared/components/data-display/page-container";
@@ -338,6 +339,7 @@ export function PayoutsView() {
                         >
                           {PAYOUT_STATUS_LABEL[payout.status]}
                         </span>
+                        <FilialTag filial={payout.filial} />
                         <span className="text-title tabular w-32 shrink-0 text-right">
                           {money.plain(payout.totalAmount)}
                         </span>

@@ -1,7 +1,10 @@
 import { tashkentFromApi, type TashkentDate } from "@/shared/lib/format/date";
+import { parseFilialRef, type FilialRef } from "@/shared/domain/filial";
 
 /** A dated note left on a client card by whoever was at the desk. */
 export interface ClientNote {
+  /** Branch the record was made in; null on an older payload. */
+  readonly filial: FilialRef | null;
   readonly id: string;
   readonly text: string;
   /** Who wrote it, so reception knows whom to ask about it. */
@@ -23,6 +26,7 @@ export function parseClientNote(raw: unknown): ClientNote {
         ? String(createdBy.full_name ?? "")
         : "";
   return {
+    filial: parseFilialRef(n.filial),
     id: String(n.id ?? ""),
     text: String(n.text ?? ""),
     author,

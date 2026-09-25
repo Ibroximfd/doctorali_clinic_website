@@ -44,6 +44,7 @@ export type ApiErrorCode =
   | "return_item_not_found"
   | "invalid_quantity"
   | "return_exceeds_quantity"
+  | "doctor_other_filial"
   | (string & {});
 
 /** Per-field validation messages: form field name → messages. */
@@ -129,6 +130,14 @@ const MESSAGE_FOR_STATUS: Readonly<Record<number, string>> = {
   401: "Avtorizatsiya talab qilinadi",
   403: "Ruxsat yo'q",
   404: "Ma'lumot topilmadi",
+};
+
+/**
+ * Codes the server may send without a sentence of its own. The server's
+ * `message` still wins whenever it writes one.
+ */
+const MESSAGE_FOR_CODE: Readonly<Record<string, string>> = {
+  doctor_other_filial: "Bu shifokor boshqa filialda. Shifokorni qaytadan tanlang",
 };
 
 const CODE_FOR_STATUS: Readonly<Record<number, ApiErrorCode>> = {
@@ -276,16 +285,19 @@ export function apiErrorFromBody(status: number, body: unknown): ApiError {
   const fields = fieldsIn(envelope);
   const fieldErrors = parseFieldErrors(fields);
 
+  const code =
+    isRecord(envelope) && typeof envelope.code === "string"
+      ? envelope.code
+      : (CODE_FOR_STATUS[status] ?? "server_error");
+
   return new ApiError({
-    code:
-      isRecord(envelope) && typeof envelope.code === "string"
-        ? envelope.code
-        : (CODE_FOR_STATUS[status] ?? "server_error"),
-    // The server's own words first, then the field that failed. The status
-    // sentence is only for a body that explained nothing.
+    code,
+    // The server's own words first, then the field that failed. The code and
+    // status sentences are only for a body that explained nothing.
     message:
       headlineIn(envelope) ??
       firstFieldMessage(fieldErrors) ??
+      MESSAGE_FOR_CODE[code] ??
       MESSAGE_FOR_STATUS[status] ??
       SERVER_ERROR,
     fieldErrors,

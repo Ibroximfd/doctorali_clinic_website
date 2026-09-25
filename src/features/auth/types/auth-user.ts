@@ -3,6 +3,8 @@
  * permission flags that decide which privileged buttons exist at all.
  */
 
+import type { UserFilial } from "@/shared/domain/filial";
+
 /**
  * What this account may do beyond everyday reception work (backend §13.1),
  * delivered inside `auth/me/` as a `permissions` block.
@@ -68,6 +70,11 @@ export interface AuthUser {
   readonly isAdmin: boolean;
   readonly avatarUrl: string | null;
   readonly permissions: UserPermissions;
+  /**
+   * The branch this account works in. Fixed by the server — the desk never
+   * switches it, and every list it sees is already scoped to it.
+   */
+  readonly filial: UserFilial | null;
 }
 
 /** Tokens plus the user, as `auth/login/` returns them. */

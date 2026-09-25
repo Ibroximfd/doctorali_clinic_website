@@ -38,6 +38,7 @@ import {
   tashkentFromApi,
   type TashkentDate,
 } from "@/shared/lib/format/date";
+import { parseFilialRef, type FilialRef } from "@/shared/domain/filial";
 
 /**
  * Reception order status. The internal backend `delivered` maps to `completed`;
@@ -194,6 +195,8 @@ export function orderDisplayClientName(o: OrderDetail): string {
 
 /** Light order shape from the list endpoints. Carries no line items. */
 export interface OrderSummary {
+  /** Branch the record was made in; null on an older payload. */
+  readonly filial: FilialRef | null;
   readonly id: string;
   readonly orderNumber: string;
   readonly clientName: string;
@@ -367,6 +370,7 @@ export function parseOrderSummary(raw: unknown): OrderSummary {
   const rawDebtStatus = o.debt_status ?? debt.status;
 
   return {
+    filial: parseFilialRef(o.filial),
     id: str(o.id),
     orderNumber: str(o.order_number),
     clientName: str(o.client_name ?? client.full_name),

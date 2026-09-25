@@ -1,8 +1,9 @@
 "use client";
 
-import { CalendarDays, Menu } from "lucide-react";
+import { Building2, CalendarDays, Menu } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { useAuthStore } from "@/features/auth/store/auth-store";
 import { dayMonthYear, nowTashkent } from "@/shared/lib/format/date";
 import { Button } from "@/shared/components/ui/button";
 
@@ -49,6 +50,7 @@ export function TopBar({
         )}
       </div>
 
+      <FilialChip />
       <TodayChip />
       {actions}
     </header>
@@ -61,6 +63,21 @@ function TodayChip() {
     <span className="border-border bg-surface hidden items-center gap-2 rounded-md border px-3 py-2 md:inline-flex">
       <CalendarDays className="text-primary size-[15px]" aria-hidden />
       <span className="text-label-sm tabular">{dayMonthYear(nowTashkent())}</span>
+    </span>
+  );
+}
+
+/**
+ * The branch this desk works in. Every list and figure on screen is already
+ * scoped to it, so naming it is what tells two branches' staff apart.
+ */
+function FilialChip() {
+  const filial = useAuthStore((s) => s.user?.filial ?? null);
+  if (filial === null) return null;
+  return (
+    <span className="border-border bg-surface hidden items-center gap-2 rounded-md border px-3 py-2 md:inline-flex">
+      <Building2 className="text-primary size-[15px]" aria-hidden />
+      <span className="text-label-sm">{filial.name}</span>
     </span>
   );
 }

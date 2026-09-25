@@ -10,6 +10,7 @@ import {
   ymd,
   type TashkentDate,
 } from "@/shared/lib/format/date";
+import { parseFilialRef, type FilialRef } from "@/shared/domain/filial";
 
 /**
  * Debt lifecycle (backend §6.3).
@@ -87,6 +88,8 @@ export interface DebtPaymentEntry {
  * not, and a badge that says "Bugun" on the wrong day is worse than no badge.
  */
 export interface Debt {
+  /** Branch the record was made in; null on an older payload. */
+  readonly filial: FilialRef | null;
   readonly id: string;
   readonly source: DebtSource;
   readonly sourceDisplay: string;
@@ -204,6 +207,7 @@ export function parseDebt(raw: unknown): Debt {
     typeof d.days_left === "number" ? d.days_left : daysBetween(nowTashkent(), dueDate);
 
   return {
+    filial: parseFilialRef(d.filial),
     id: str(d.id),
     source: parseDebtSource(d.source),
     sourceDisplay: str(d.source_display),

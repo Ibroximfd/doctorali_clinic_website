@@ -5,6 +5,7 @@ import {
   tashkentFromApi,
   type TashkentDate,
 } from "@/shared/lib/format/date";
+import { parseFilialRef, type FilialRef } from "@/shared/domain/filial";
 
 /** Why the client is coming in. */
 export const APPOINTMENT_PURPOSES = [
@@ -98,6 +99,8 @@ export interface AppointmentTreatmentRef {
  * break the list.
  */
 export interface Appointment {
+  /** Branch the record was made in; null on an older payload. */
+  readonly filial: FilialRef | null;
   readonly id: string;
   readonly client: ClientRef | null;
   readonly clientName: string;
@@ -237,6 +240,7 @@ export function parseAppointment(raw: unknown): Appointment {
   const a = isRecord(raw) ? raw : {};
   const order = parseOrderRef(a.order);
   return {
+    filial: parseFilialRef(a.filial),
     id: str(a.id),
     client: maybeParseClientRef(a.client),
     clientName: str(a.client_name),

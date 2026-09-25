@@ -13,6 +13,7 @@ import {
 } from "@/shared/domain/payment-type";
 import { percent } from "@/shared/lib/format/percent";
 import { tashkentFromApi, type TashkentDate } from "@/shared/lib/format/date";
+import { parseFilialRef, type FilialRef } from "@/shared/domain/filial";
 
 export type { TreatmentKind };
 
@@ -48,6 +49,8 @@ export const TREATMENT_STATUS_LABEL: Readonly<Record<TreatmentStatus, string>> =
  * percentage can't rewrite history.
  */
 export interface Treatment {
+  /** Branch the record was made in; null on an older payload. */
+  readonly filial: FilialRef | null;
   readonly id: string;
   readonly kind: TreatmentKind;
   readonly kindDisplay: string;
@@ -124,6 +127,7 @@ export function parseTreatment(raw: unknown): Treatment {
   const rawPaymentType = t.payment_type;
 
   return {
+    filial: parseFilialRef(t.filial),
     id: str(t.id),
     kind: parseTreatmentKind(t.kind),
     kindDisplay: str(t.kind_display),

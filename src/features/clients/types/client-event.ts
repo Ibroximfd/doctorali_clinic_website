@@ -1,5 +1,6 @@
 import { maybeParseDoctorRef, type DoctorRef } from "@/features/doctors/types/doctor";
 import { tashkentFromApi, type TashkentDate } from "@/shared/lib/format/date";
+import { parseFilialRef, type FilialRef } from "@/shared/domain/filial";
 
 /**
  * What happened, on a client's history feed.
@@ -126,6 +127,8 @@ export interface EventActor {
  * backend from ever disagreeing about wording.
  */
 export interface ClientEvent {
+  /** Branch the record was made in; null on an older payload. */
+  readonly filial: FilialRef | null;
   readonly id: number;
   readonly kind: ClientEventKind;
   /** Server label for the kind; empty rather than a guess. */
@@ -158,6 +161,7 @@ export function parseClientEvent(raw: unknown): ClientEvent {
   const e = isRecord(raw) ? raw : {};
   const actor = e.actor;
   return {
+    filial: parseFilialRef(e.filial),
     id: typeof e.id === "number" ? e.id : Number(e.id ?? 0),
     kind: parseClientEventKind(e.kind),
     kindDisplay: str(e.kind_display),

@@ -9,6 +9,7 @@ import {
   ymd,
   type TashkentDate,
 } from "@/shared/lib/format/date";
+import { parseFilialRef, type FilialRef } from "@/shared/domain/filial";
 
 /** Doctor reference embedded in every payout payload. */
 export interface PayoutDoctor {
@@ -180,6 +181,8 @@ export interface WeekDetail {
 
 /** A weekly payout record. */
 export interface Payout {
+  /** Branch the record was made in; null on an older payload. */
+  readonly filial: FilialRef | null;
   readonly id: string;
   readonly doctor: PayoutDoctor;
   readonly weekStart: TashkentDate;
@@ -366,6 +369,7 @@ export function parsePayout(raw: unknown): Payout {
   const paidBy = isRecord(p.paid_by) ? p.paid_by : {};
   const status = p.status === "paid" || p.status === "cancelled" ? p.status : "unknown";
   return {
+    filial: parseFilialRef(p.filial),
     id: str(p.id),
     doctor: parsePayoutDoctor(p.doctor),
     weekStart: dateFromYmd(str(p.week_start)),

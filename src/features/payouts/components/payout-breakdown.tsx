@@ -66,9 +66,9 @@ export function PayoutBreakdown({ days }: { days: readonly PayoutDay[] }) {
             </div>
           ))}
 
-          {day.treatments.map((treatment) => (
+          {day.treatments.map((treatment, index) => (
             <div
-              key={treatment.treatmentId}
+              key={treatment.treatmentId || `treatment-${index}`}
               className="border-surface-alt mt-2 border-t pt-2"
             >
               <div className="flex items-baseline gap-2">

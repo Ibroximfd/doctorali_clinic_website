@@ -1,4 +1,5 @@
 import { tashkentFromApi, type TashkentDate } from "@/shared/lib/format/date";
+import { parseFilialRef, type FilialRef } from "@/shared/domain/filial";
 
 /**
  * Outcome of the most recent contact attempt.
@@ -129,6 +130,8 @@ export interface FollowupEntry {
 
 /** One past contact attempt (newest first in the history list). */
 export interface FollowupHistoryEntry {
+  /** Branch the record was made in; null on an older payload. */
+  readonly filial: FilialRef | null;
   readonly status: FollowupStatus;
   readonly statusDisplay: string;
   readonly note: string;
@@ -210,6 +213,7 @@ export function parseFollowupHistoryEntry(raw: unknown): FollowupHistoryEntry {
   const by = isRecord(h.contacted_by) ? h.contacted_by : {};
   const status = parseFollowupStatus(h.status);
   return {
+    filial: parseFilialRef(h.filial),
     status,
     statusDisplay: str(h.status_display, FOLLOWUP_STATUS_LABEL[status]),
     note: str(h.note),

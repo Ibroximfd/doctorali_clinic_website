@@ -14,6 +14,7 @@ import {
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { dayMonthTime } from "@/shared/lib/format/date";
 import { phoneFromApi } from "@/shared/lib/format/phone";
+import { FilialTag } from "@/shared/components/data-display/filial-tag";
 import { cn } from "@/shared/lib/utils";
 
 import { useFollowupHistoryQuery } from "../hooks/use-followups";
@@ -82,6 +83,7 @@ export function FollowupHistoryDialog({
                   >
                     {item.statusDisplay}
                   </span>
+                  <FilialTag filial={item.filial} />
                   <span className="text-caption text-text-tertiary ml-auto">
                     {dayMonthTime(item.contactedAt)}
                   </span>

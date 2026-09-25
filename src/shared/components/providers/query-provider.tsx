@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  MutationCache,
   QueryClient,
   QueryClientProvider,
   type QueryClientConfig,
@@ -49,6 +50,21 @@ const config: QueryClientConfig = {
 export function QueryProvider({ children }: { children: ReactNode }) {
   // One client per browser session, created inside the component so a Fast
   // Refresh (or a second render in StrictMode) never discards the cache.
-  const [client] = useState(() => new QueryClient(config));
+  const [client] = useState(() => {
+    const queryClient: QueryClient = new QueryClient({
+      ...config,
+      mutationCache: new MutationCache({
+        onError(error) {
+          // The doctor pickers only ever list this branch's doctors, so this
+          // refusal means the roster on screen is stale — refresh it for
+          // whichever form sent the write.
+          if (ApiError.is(error) && error.code === "doctor_other_filial") {
+            void queryClient.invalidateQueries({ queryKey: ["doctors"] });
+          }
+        },
+      }),
+    });
+    return queryClient;
+  });
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }

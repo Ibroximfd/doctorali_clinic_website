@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Building2,
   CalendarClock,
   CheckCircle2,
   Flag,
@@ -158,6 +159,10 @@ export function AppointmentDetailDialog({
               value={appointment.doctor.fullName}
               hint={appointment.doctor.specialty || undefined}
             />
+          )}
+
+          {appointment.filial && (
+            <InfoRow icon={Building2} label="Filial" value={appointment.filial.name} />
           )}
 
           {appointment.arrivedAt && (

@@ -1,3 +1,4 @@
+import { parseUserFilial } from "@/shared/domain/filial";
 import { endpoints } from "@/shared/lib/api/endpoints";
 import { http } from "@/shared/lib/api/http";
 
@@ -48,6 +49,7 @@ export function parseAuthUser(raw: unknown): AuthUser {
     isAdmin: bool(u.is_admin, false),
     avatarUrl: typeof u.avatar_url === "string" ? u.avatar_url : null,
     permissions: parsePermissions(u.permissions),
+    filial: parseUserFilial(u.filial),
   };
 }
 

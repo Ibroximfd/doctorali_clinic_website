@@ -32,6 +32,7 @@ import { useState } from "react";
 
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { ErrorState } from "@/shared/components/feedback/error-state";
+import { FilialTag } from "@/shared/components/data-display/filial-tag";
 import { PaginationBar } from "@/shared/components/data-display/pagination-bar";
 import { DateFilter } from "@/shared/components/data-display/date-filter";
 import { Skeleton } from "@/shared/components/ui/skeleton";
@@ -229,9 +230,12 @@ function TimelineRow({ event, isLast }: { event: ClientEvent; isLast: boolean })
             </span>
           )}
         </div>
-        <p className="text-caption text-text-tertiary tabular">
-          {shortDateTime(event.createdAt)}
-          {who !== "" && ` · ${who}`}
+        <p className="text-caption text-text-tertiary tabular flex flex-wrap items-center gap-x-2">
+          <span>
+            {shortDateTime(event.createdAt)}
+            {who !== "" && ` · ${who}`}
+          </span>
+          <FilialTag filial={event.filial} />
         </p>
       </div>
     </li>
